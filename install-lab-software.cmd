@@ -575,17 +575,17 @@ REM Calculate filled and empty sections (40 character width)
 set /a FILLED=(%STEP% * 40) / %TOTAL%
 set /a EMPTY=40 - FILLED
 
-REM Build progress bar string
+REM Build progress bar string using ASCII characters
 set BAR=
-for /l %%i in (1,1,%FILLED%) do set BAR=!BAR!█
-for /l %%i in (1,1,%EMPTY%) do set BAR=!BAR!░
+for /l %%i in (1,1,%FILLED%) do set BAR=!BAR!#
+for /l %%i in (1,1,%EMPTY%) do set BAR=!BAR!-
 
 REM Display progress bar
 echo.
-echo ════════════════════════════════════════════════════════════════
+echo ================================================================
 echo Overall Progress: [!BAR!] !PERCENT!%%
 echo Step %STEP% of %TOTAL%: %LABEL%
-echo ════════════════════════════════════════════════════════════════
+echo ================================================================
 echo.
 goto :eof
 
