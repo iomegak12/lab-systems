@@ -188,8 +188,7 @@ echo [5/15] Checking GitHub CLI... >> "%LOG_FILE%"
 
 gh --version >nul 2>&1
 if %errorLevel% equ 0 (
-    for /f "tokens=*" %%a in ('gh --version ^| findstr /C:"gh version"') do set GH_VER=%%a
-    echo GitHub CLI already installed: !GH_VER!. Skipping...
+    echo GitHub CLI already installed. Skipping...
     echo GitHub CLI already installed >> "%LOG_FILE%"
 ) else (
     echo Installing GitHub CLI...
@@ -271,9 +270,7 @@ echo [8/15] Checking Visual Studio Code... >> "%LOG_FILE%"
 
 code --version >nul 2>&1
 if %errorLevel% equ 0 (
-    for /f "tokens=*" %%a in ('code --version ^| findstr /R "[0-9]"') do set CODE_VER=%%a & goto :code_found
-    :code_found
-    echo Visual Studio Code already installed: !CODE_VER!. Skipping...
+    echo Visual Studio Code already installed. Skipping...
     echo Visual Studio Code already installed >> "%LOG_FILE%"
 ) else (
     echo Installing Visual Studio Code...
@@ -370,8 +367,7 @@ echo [12/15] Checking Multipass... >> "%LOG_FILE%"
 
 multipass version >nul 2>&1
 if %errorLevel% equ 0 (
-    for /f "tokens=*" %%a in ('multipass version ^| findstr "multipass"') do set MP_VER=%%a
-    echo Multipass already installed: !MP_VER!. Skipping...
+    echo Multipass already installed. Skipping...
     echo Multipass already installed >> "%LOG_FILE%"
 ) else (
     echo Installing Multipass...
