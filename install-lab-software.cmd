@@ -312,29 +312,43 @@ call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing WSL and Ubuntu"
 echo [13/15] Installing WSL and Ubuntu...
 echo [13/15] Installing WSL and Ubuntu... >> "%LOG_FILE%"
 
-REM Check if WSL is already installed
-wsl --version >nul 2>&1
-if %errorLevel% neq 0 (
-    echo Installing WSL...
-    wsl --install --no-launch >> "%LOG_FILE%" 2>&1
-    echo WSL installation initiated. A restart may be required.
-    echo WSL installation initiated >> "%LOG_FILE%"
+REM Enable WSL and Virtual Machine Platform features
+echo Enabling WSL features...
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart >> "%LOG_FILE%" 2>&1
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart >> "%LOG_FILE%" 2>&1
+
+if %errorLevel% equ 0 (
+    echo WSL features enabled successfully.
+    echo WSL features will be available after system restart.
+    echo WSL features enabled >> "%LOG_FILE%"
 ) else (
-    echo WSL already installed.
-    echo WSL already installed >> "%LOG_FILE%"
+    echo WSL feature enablement completed with code: %errorLevel%
+    echo WSL feature enablement may require manual verification.
+    echo WSL feature enablement exit code: %errorLevel% >> "%LOG_FILE%"
 )
 
-REM Install Ubuntu distribution
-wsl --list --verbose | findstr "Ubuntu" >nul 2>&1
-if %errorLevel% neq 0 (
-    echo Installing Ubuntu distribution...
-    wsl --install -d Ubuntu --no-launch >> "%LOG_FILE%" 2>&1
-    echo Ubuntu distribution installation initiated.
-    echo Ubuntu installation initiated >> "%LOG_FILE%"
+REM Download and install WSL2 kernel update
+echo Downloading WSL2 kernel update...
+powershell -Command "Invoke-WebRequest -Uri 'https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi' -OutFile '%TEMP%\wsl_update_x64.msi'" >> "%LOG_FILE%" 2>&1
+
+if exist "%TEMP%\wsl_update_x64.msi" (
+    echo Installing WSL2 kernel update...
+    msiexec /i "%TEMP%\wsl_update_x64.msi" /quiet /norestart >> "%LOG_FILE%" 2>&1
+    echo WSL2 kernel update installed.
+    echo WSL2 kernel update installed >> "%LOG_FILE%"
+    del "%TEMP%\wsl_update_x64.msi" >nul 2>&1
 ) else (
-    echo Ubuntu distribution already installed.
-    echo Ubuntu already installed >> "%LOG_FILE%"
+    echo WSL2 kernel download failed. Will be available via Windows Update.
+    echo WSL2 kernel download failed >> "%LOG_FILE%"
 )
+
+echo.
+echo NOTE: WSL and Ubuntu installation requires a system restart.
+echo After restart, you can install Ubuntu by running:
+echo   wsl --install -d Ubuntu
+echo Or use Microsoft Store to install Ubuntu.
+echo.
+echo WSL installation completed (restart required) >> "%LOG_FILE%"
 echo.
 
 REM ========================================================================
