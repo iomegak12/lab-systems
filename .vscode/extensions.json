@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "ms-vscode.powershell",
+        "esbenp.prettier-vscode",
+        "shd101wyy.markdown-preview-enhanced",
+        "redhat.vscode-yaml"
+    ]
+}
