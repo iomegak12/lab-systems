@@ -8,7 +8,7 @@ REM ========================================================================
 setlocal EnableDelayedExpansion
 
 REM Progress tracking variables
-set TOTAL_STEPS=15
+set TOTAL_STEPS=16
 set CURRENT_STEP=0
 
 REM Check for Administrator privileges
@@ -294,13 +294,40 @@ call :RefreshPath
 echo.
 
 REM ========================================================================
-REM Step 9: Install Google Chrome
+REM Step 9: Install PowerShell Core
+REM ========================================================================
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing PowerShell Core"
+
+echo [9/16] Checking PowerShell Core...
+echo [9/16] Checking PowerShell Core... >> "%LOG_FILE%"
+
+pwsh --version >nul 2>&1
+if %errorLevel% equ 0 (
+    echo PowerShell Core already installed. Skipping...
+    echo PowerShell Core already installed >> "%LOG_FILE%"
+) else (
+    echo Installing PowerShell Core...
+    choco install powershell-core -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo PowerShell Core installed successfully!
+        echo PowerShell Core installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo PowerShell Core installation completed with code: !errorLevel!
+        echo PowerShell Core installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
+)
+call :RefreshPath
+echo.
+
+REM ========================================================================
+REM Step 10: Install Google Chrome
 REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Google Chrome"
 
-echo [9/15] Checking Google Chrome...
-echo [9/15] Checking Google Chrome... >> "%LOG_FILE%"
+echo [10/16] Checking Google Chrome...
+echo [10/16] Checking Google Chrome... >> "%LOG_FILE%"
 
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
     echo Google Chrome already installed. Skipping...
@@ -331,8 +358,8 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Fira Code Font"
 
-echo [10/15] Installing Fira Code Font...
-echo [10/15] Installing Fira Code Font... >> "%LOG_FILE%"
+echo [11/16] Installing Fira Code Font...
+echo [11/16] Installing Fira Code Font... >> "%LOG_FILE%"
 choco install firacode -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Fira Code Font installed successfully!
@@ -350,8 +377,8 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Windows Terminal"
 
-echo [11/15] Installing Windows Terminal...
-echo [11/15] Installing Windows Terminal... >> "%LOG_FILE%"
+echo [12/16] Installing Windows Terminal...
+echo [12/16] Installing Windows Terminal... >> "%LOG_FILE%"
 choco install microsoft-windows-terminal -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Windows Terminal installed successfully!
@@ -369,8 +396,8 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Multipass"
 
-echo [12/15] Checking Multipass...
-echo [12/15] Checking Multipass... >> "%LOG_FILE%"
+echo [13/16] Checking Multipass...
+echo [13/16] Checking Multipass... >> "%LOG_FILE%"
 
 multipass version >nul 2>&1
 if %errorLevel% equ 0 (
@@ -396,8 +423,8 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing WSL and Ubuntu"
 
-echo [13/15] Installing WSL and Ubuntu...
-echo [13/15] Installing WSL and Ubuntu... >> "%LOG_FILE%"
+echo [14/16] Installing WSL and Ubuntu...
+echo [14/16] Installing WSL and Ubuntu... >> "%LOG_FILE%"
 
 REM Enable WSL and Virtual Machine Platform features
 echo Enabling WSL features...
@@ -459,8 +486,8 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing UV Python Package Manager"
 
-echo [14/15] Installing UV Python package manager...
-echo [14/15] Installing UV Python package manager... >> "%LOG_FILE%"
+echo [15/16] Installing UV Python package manager...
+echo [15/16] Installing UV Python package manager... >> "%LOG_FILE%"
 
 REM Refresh environment variables
 echo Refreshing PATH environment...
@@ -494,8 +521,8 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing VS Code Extensions"
 
-echo [15/15] Installing VS Code Extensions...
-echo [15/15] Installing VS Code Extensions... >> "%LOG_FILE%"
+echo [16/16] Installing VS Code Extensions...
+echo [16/16] Installing VS Code Extensions... >> "%LOG_FILE%"
 
 REM Refresh PATH again to ensure code command is available
 call :RefreshPath
