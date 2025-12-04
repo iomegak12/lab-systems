@@ -7,6 +7,10 @@ REM ========================================================================
 
 setlocal EnableDelayedExpansion
 
+REM Progress tracking variables
+set TOTAL_STEPS=15
+set CURRENT_STEP=0
+
 REM Check for Administrator privileges
 net session >nul 2>&1
 if %errorLevel% neq 0 (
@@ -48,8 +52,11 @@ ping 127.0.0.1 -n 4 >nul 2>&1
 REM ========================================================================
 REM Step 1: Install Chocolatey Package Manager
 REM ========================================================================
-echo [1/13] Checking Chocolatey Package Manager...
-echo [1/13] Checking Chocolatey Package Manager... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Chocolatey Package Manager"
+
+echo [1/15] Checking Chocolatey Package Manager...
+echo [1/15] Checking Chocolatey Package Manager... >> "%LOG_FILE%"
 
 where choco >nul 2>&1
 if %errorLevel% neq 0 (
@@ -90,8 +97,11 @@ echo.
 REM ========================================================================
 REM Step 2: Install Python 3.12
 REM ========================================================================
-echo [2/13] Installing Python 3.12...
-echo [2/13] Installing Python 3.12... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Python 3.12"
+
+echo [2/15] Installing Python 3.12...
+echo [2/15] Installing Python 3.12... >> "%LOG_FILE%"
 choco install python312 -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Python 3.12 installed successfully!
@@ -106,8 +116,11 @@ echo.
 REM ========================================================================
 REM Step 3: Install Node.js
 REM ========================================================================
-echo [3/13] Installing Node.js...
-echo [3/13] Installing Node.js... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Node.js"
+
+echo [3/15] Installing Node.js...
+echo [3/15] Installing Node.js... >> "%LOG_FILE%"
 choco install nodejs -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Node.js installed successfully!
@@ -122,8 +135,11 @@ echo.
 REM ========================================================================
 REM Step 4: Install Git
 REM ========================================================================
-echo [4/13] Installing Git...
-echo [4/13] Installing Git... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Git"
+
+echo [4/15] Installing Git...
+echo [4/15] Installing Git... >> "%LOG_FILE%"
 choco install git -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Git installed successfully!
@@ -138,8 +154,11 @@ echo.
 REM ========================================================================
 REM Step 5: Install GitHub CLI
 REM ========================================================================
-echo [5/13] Installing GitHub CLI...
-echo [5/13] Installing GitHub CLI... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing GitHub CLI"
+
+echo [5/15] Installing GitHub CLI...
+echo [5/15] Installing GitHub CLI... >> "%LOG_FILE%"
 choco install gh -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo GitHub CLI installed successfully!
@@ -154,8 +173,11 @@ echo.
 REM ========================================================================
 REM Step 6: Install Docker Desktop
 REM ========================================================================
-echo [6/13] Installing Docker Desktop...
-echo [6/13] Installing Docker Desktop... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Docker Desktop"
+
+echo [6/15] Installing Docker Desktop...
+echo [6/15] Installing Docker Desktop... >> "%LOG_FILE%"
 choco install docker-desktop -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Docker Desktop installed successfully!
@@ -170,8 +192,11 @@ echo.
 REM ========================================================================
 REM Step 7: Install kubectl
 REM ========================================================================
-echo [7/13] Installing kubectl...
-echo [7/13] Installing kubectl... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing kubectl"
+
+echo [7/15] Installing kubectl...
+echo [7/15] Installing kubectl... >> "%LOG_FILE%"
 choco install kubernetes-cli -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo kubectl installed successfully!
@@ -186,8 +211,11 @@ echo.
 REM ========================================================================
 REM Step 8: Install Visual Studio Code
 REM ========================================================================
-echo [8/13] Installing Visual Studio Code...
-echo [8/13] Installing Visual Studio Code... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Visual Studio Code"
+
+echo [8/15] Installing Visual Studio Code...
+echo [8/15] Installing Visual Studio Code... >> "%LOG_FILE%"
 choco install vscode -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Visual Studio Code installed successfully!
@@ -202,8 +230,11 @@ echo.
 REM ========================================================================
 REM Step 9: Install Google Chrome
 REM ========================================================================
-echo [9/13] Installing Google Chrome...
-echo [9/13] Installing Google Chrome... >> "%LOG_FILE%"
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Google Chrome"
+
+echo [9/15] Installing Google Chrome...
+echo [9/15] Installing Google Chrome... >> "%LOG_FILE%"
 choco install googlechrome -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Google Chrome installed successfully!
@@ -218,6 +249,9 @@ echo.
 REM ========================================================================
 REM Step 10: Install Fira Code Font
 REM ========================================================================
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Fira Code Font"
+
 echo [10/15] Installing Fira Code Font...
 echo [10/15] Installing Fira Code Font... >> "%LOG_FILE%"
 choco install firacode -y --force >> "%LOG_FILE%" 2>&1
@@ -234,6 +268,9 @@ echo.
 REM ========================================================================
 REM Step 11: Install Windows Terminal
 REM ========================================================================
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Windows Terminal"
+
 echo [11/15] Installing Windows Terminal...
 echo [11/15] Installing Windows Terminal... >> "%LOG_FILE%"
 choco install microsoft-windows-terminal -y --force >> "%LOG_FILE%" 2>&1
@@ -250,6 +287,9 @@ echo.
 REM ========================================================================
 REM Step 12: Install Multipass
 REM ========================================================================
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Multipass"
+
 echo [12/15] Installing Multipass...
 echo [12/15] Installing Multipass... >> "%LOG_FILE%"
 choco install multipass -y --force >> "%LOG_FILE%" 2>&1
@@ -266,6 +306,9 @@ echo.
 REM ========================================================================
 REM Step 13: Install WSL and Ubuntu
 REM ========================================================================
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing WSL and Ubuntu"
+
 echo [13/15] Installing WSL and Ubuntu...
 echo [13/15] Installing WSL and Ubuntu... >> "%LOG_FILE%"
 
@@ -297,6 +340,9 @@ echo.
 REM ========================================================================
 REM Step 14: Refresh PATH and Install UV via pip
 REM ========================================================================
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing UV Python Package Manager"
+
 echo [14/15] Installing UV Python package manager...
 echo [14/15] Installing UV Python package manager... >> "%LOG_FILE%"
 
@@ -329,6 +375,9 @@ echo.
 REM ========================================================================
 REM Step 15: Install VS Code Extensions
 REM ========================================================================
+set /a CURRENT_STEP+=1
+call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing VS Code Extensions"
+
 echo [15/15] Installing VS Code Extensions...
 echo [15/15] Installing VS Code Extensions... >> "%LOG_FILE%"
 
@@ -452,6 +501,9 @@ echo.
 REM ========================================================================
 REM Installation Complete
 REM ========================================================================
+echo.
+call :DrawProgressBar %TOTAL_STEPS% %TOTAL_STEPS% "Installation Complete!"
+echo.
 echo ========================================================================
 echo                  INSTALLATION COMPLETED
 echo ========================================================================
@@ -496,6 +548,32 @@ exit /b 0
 REM ========================================================================
 REM Helper Functions
 REM ========================================================================
+
+:DrawProgressBar
+set STEP=%~1
+set TOTAL=%~2
+set LABEL=%~3
+
+REM Calculate percentage
+set /a PERCENT=(%STEP% * 100) / %TOTAL%
+
+REM Calculate filled and empty sections (40 character width)
+set /a FILLED=(%STEP% * 40) / %TOTAL%
+set /a EMPTY=40 - FILLED
+
+REM Build progress bar string
+set BAR=
+for /l %%i in (1,1,%FILLED%) do set BAR=!BAR!█
+for /l %%i in (1,1,%EMPTY%) do set BAR=!BAR!░
+
+REM Display progress bar
+echo.
+echo ════════════════════════════════════════════════════════════════
+echo Overall Progress: [!BAR!] !PERCENT!%%
+echo Step %STEP% of %TOTAL%: %LABEL%
+echo ════════════════════════════════════════════════════════════════
+echo.
+goto :eof
 
 :InstallExtension
 set EXT_ID=%~1
