@@ -43,7 +43,7 @@ echo Installation started at %date% %time% > "%LOG_FILE%"
 echo Installation log will be saved to:
 echo %LOG_FILE%
 echo.
-timeout /t 3 /nobreak >nul
+ping 127.0.0.1 -n 4 >nul 2>&1
 
 REM ========================================================================
 REM Step 1: Install Chocolatey Package Manager
@@ -63,12 +63,18 @@ if %errorLevel% neq 0 (
     REM Refresh environment
     call :RefreshPath
 
-    REM Verify installation
-    timeout /t 5 /nobreak >nul
+    REM Verify installation (wait 5 seconds using ping instead of timeout for compatibility)
+    ping 127.0.0.1 -n 6 >nul 2>&1
     where choco >nul 2>&1
     if !errorLevel! neq 0 (
         echo ERROR: Failed to install Chocolatey. Please install manually.
         echo ERROR: Chocolatey installation failed >> "%LOG_FILE%"
+        echo.
+        echo Manual installation instructions:
+        echo 1. Visit: https://chocolatey.org/install
+        echo 2. Run PowerShell as Administrator
+        echo 3. Execute the installation command from the website
+        echo.
         pause
         exit /b 1
     )
@@ -210,10 +216,42 @@ call :RefreshPath
 echo.
 
 REM ========================================================================
-REM Step 10: Install Multipass
+REM Step 10: Install Fira Code Font
 REM ========================================================================
-echo [10/13] Installing Multipass...
-echo [10/13] Installing Multipass... >> "%LOG_FILE%"
+echo [10/15] Installing Fira Code Font...
+echo [10/15] Installing Fira Code Font... >> "%LOG_FILE%"
+choco install firacode -y --force >> "%LOG_FILE%" 2>&1
+if %errorLevel% equ 0 (
+    echo Fira Code Font installed successfully!
+    echo Fira Code Font installed successfully >> "%LOG_FILE%"
+) else (
+    echo Fira Code Font installation completed with code: %errorLevel%
+    echo Fira Code Font installation exit code: %errorLevel% >> "%LOG_FILE%"
+)
+call :RefreshPath
+echo.
+
+REM ========================================================================
+REM Step 11: Install Windows Terminal
+REM ========================================================================
+echo [11/15] Installing Windows Terminal...
+echo [11/15] Installing Windows Terminal... >> "%LOG_FILE%"
+choco install microsoft-windows-terminal -y --force >> "%LOG_FILE%" 2>&1
+if %errorLevel% equ 0 (
+    echo Windows Terminal installed successfully!
+    echo Windows Terminal installed successfully >> "%LOG_FILE%"
+) else (
+    echo Windows Terminal installation completed with code: %errorLevel%
+    echo Windows Terminal installation exit code: %errorLevel% >> "%LOG_FILE%"
+)
+call :RefreshPath
+echo.
+
+REM ========================================================================
+REM Step 12: Install Multipass
+REM ========================================================================
+echo [12/15] Installing Multipass...
+echo [12/15] Installing Multipass... >> "%LOG_FILE%"
 choco install multipass -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Multipass installed successfully!
@@ -226,10 +264,10 @@ call :RefreshPath
 echo.
 
 REM ========================================================================
-REM Step 11: Install WSL and Ubuntu
+REM Step 13: Install WSL and Ubuntu
 REM ========================================================================
-echo [11/13] Installing WSL and Ubuntu...
-echo [11/13] Installing WSL and Ubuntu... >> "%LOG_FILE%"
+echo [13/15] Installing WSL and Ubuntu...
+echo [13/15] Installing WSL and Ubuntu... >> "%LOG_FILE%"
 
 REM Check if WSL is already installed
 wsl --version >nul 2>&1
@@ -257,17 +295,17 @@ if %errorLevel% neq 0 (
 echo.
 
 REM ========================================================================
-REM Step 12: Refresh PATH and Install UV via pip
+REM Step 14: Refresh PATH and Install UV via pip
 REM ========================================================================
-echo [12/13] Installing UV Python package manager...
-echo [12/13] Installing UV Python package manager... >> "%LOG_FILE%"
+echo [14/15] Installing UV Python package manager...
+echo [14/15] Installing UV Python package manager... >> "%LOG_FILE%"
 
 REM Refresh environment variables
 echo Refreshing PATH environment...
 call :RefreshPath
 
 REM Wait a moment for Python to be fully available
-timeout /t 3 /nobreak >nul
+ping 127.0.0.1 -n 4 >nul 2>&1
 
 REM Try to install UV using pip
 python --version >nul 2>&1
@@ -289,16 +327,16 @@ if %errorLevel% equ 0 (
 echo.
 
 REM ========================================================================
-REM Step 13: Install VS Code Extensions
+REM Step 15: Install VS Code Extensions
 REM ========================================================================
-echo [13/13] Installing VS Code Extensions...
-echo [13/13] Installing VS Code Extensions... >> "%LOG_FILE%"
+echo [15/15] Installing VS Code Extensions...
+echo [15/15] Installing VS Code Extensions... >> "%LOG_FILE%"
 
 REM Refresh PATH again to ensure code command is available
 call :RefreshPath
 
 REM Wait for VS Code to be available
-timeout /t 3 /nobreak >nul
+ping 127.0.0.1 -n 4 >nul 2>&1
 
 code --version >nul 2>&1
 if %errorLevel% equ 0 (
@@ -330,7 +368,7 @@ if %errorLevel% equ 0 (
 echo.
 
 REM ========================================================================
-REM Step 14: Enable Kubernetes in Docker Desktop
+REM Post-Installation Configuration
 REM ========================================================================
 echo.
 echo ========================================================================
@@ -370,6 +408,48 @@ if exist "%DOCKER_SETTINGS%" (
 echo.
 
 REM ========================================================================
+REM Configure Windows Terminal Settings
+REM ========================================================================
+echo.
+echo ========================================================================
+echo Configuring Windows Terminal...
+echo ========================================================================
+echo Windows Terminal configuration... >> "%LOG_FILE%"
+echo.
+
+REM Windows Terminal settings path
+set WT_SETTINGS=%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json
+
+if exist "%WT_SETTINGS%" (
+    echo Windows Terminal settings found. Creating backup...
+    copy "%WT_SETTINGS%" "%WT_SETTINGS%.backup" >nul 2>&1
+
+    REM Configure Windows Terminal with PowerShell
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $settingsPath = '%WT_SETTINGS%'; if (Test-Path $settingsPath) { $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json; if (-not $settings.profiles.defaults) { $settings.profiles | Add-Member -NotePropertyName 'defaults' -NotePropertyValue @{} -Force }; $settings.profiles.defaults | Add-Member -NotePropertyName 'fontFace' -NotePropertyValue 'Fira Code' -Force; $settings.profiles.defaults | Add-Member -NotePropertyName 'fontSize' -NotePropertyValue 12 -Force; $cmdGuid = ($settings.profiles.list | Where-Object { $_.name -eq 'Command Prompt' -or $_.commandline -like '*cmd.exe*' }).guid; if ($cmdGuid) { $settings | Add-Member -NotePropertyName 'defaultProfile' -NotePropertyValue $cmdGuid -Force }; $settings | ConvertTo-Json -Depth 32 | Set-Content $settingsPath } }" >> "%LOG_FILE%" 2>&1
+
+    if !errorLevel! equ 0 (
+        echo Windows Terminal configured successfully!
+        echo  - Default profile: Command Prompt
+        echo  - Font: Fira Code
+        echo  - Font size: 12
+        echo Windows Terminal configured >> "%LOG_FILE%"
+    ) else (
+        echo Windows Terminal auto-configuration failed.
+        echo Please configure manually:
+        echo  1. Open Windows Terminal
+        echo  2. Press Ctrl+, to open settings
+        echo  3. Set default profile to Command Prompt
+        echo  4. In Appearance, set font to Fira Code and size to 12
+        echo Windows Terminal config failed >> "%LOG_FILE%"
+    )
+) else (
+    echo Windows Terminal settings not found.
+    echo Launch Windows Terminal once, then re-run this script or configure manually.
+    echo Windows Terminal settings file not found >> "%LOG_FILE%"
+)
+echo.
+
+REM ========================================================================
 REM Installation Complete
 REM ========================================================================
 echo ========================================================================
@@ -382,22 +462,27 @@ echo IMPORTANT NEXT STEPS:
 echo.
 echo 1. RESTART YOUR COMPUTER to ensure all PATH changes take effect
 echo.
-echo 2. After restart, configure Docker Desktop:
+echo 2. Launch Windows Terminal to verify configuration:
+echo    - Default profile should be Command Prompt
+echo    - Font should be Fira Code, size 12
+echo    - If not configured, press Ctrl+, and adjust manually
+echo.
+echo 3. After restart, configure Docker Desktop:
 echo    - Launch Docker Desktop
 echo    - Go to Settings ^> Kubernetes
 echo    - Enable Kubernetes if not already enabled
 echo    - Apply and restart Docker Desktop
 echo.
-echo 3. Complete WSL setup ^(if first-time installation^):
+echo 4. Complete WSL setup ^(if first-time installation^):
 echo    - Open PowerShell or Command Prompt
 echo    - Run: wsl --install
 echo    - Create Ubuntu user account when prompted
 echo.
-echo 4. Verify UV installation after restart:
+echo 5. Verify UV installation after restart:
 echo    - Run: uv --version
 echo    - If not found, run: pip install uv
 echo.
-echo 5. Run the installation-check.ps1 script to verify all installations:
+echo 6. Run the installation-check.ps1 script to verify all installations:
 echo    - powershell -ExecutionPolicy Bypass -File installation-check.ps1
 echo.
 echo Installation log saved to: %LOG_FILE%
