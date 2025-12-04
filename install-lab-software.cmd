@@ -268,8 +268,15 @@ call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Visual Studio Cod
 echo [8/15] Checking Visual Studio Code...
 echo [8/15] Checking Visual Studio Code... >> "%LOG_FILE%"
 
-code --version >nul 2>&1
+REM Check if VS Code is installed by looking for the executable
+where code >nul 2>&1
 if %errorLevel% equ 0 (
+    echo Visual Studio Code already installed. Skipping...
+    echo Visual Studio Code already installed >> "%LOG_FILE%"
+) else if exist "%ProgramFiles%\Microsoft VS Code\Code.exe" (
+    echo Visual Studio Code already installed. Skipping...
+    echo Visual Studio Code already installed >> "%LOG_FILE%"
+) else if exist "%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe" (
     echo Visual Studio Code already installed. Skipping...
     echo Visual Studio Code already installed >> "%LOG_FILE%"
 ) else (
