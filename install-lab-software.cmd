@@ -46,43 +46,38 @@ echo.
 timeout /t 3 /nobreak >nul
 
 REM ========================================================================
-REM Step 1: Check and Install Winget (Windows Package Manager)
+REM Step 1: Install Chocolatey Package Manager
 REM ========================================================================
-echo [1/13] Checking Windows Package Manager (winget)...
-echo [1/13] Checking Windows Package Manager (winget)... >> "%LOG_FILE%"
+echo [1/13] Checking Chocolatey Package Manager...
+echo [1/13] Checking Chocolatey Package Manager... >> "%LOG_FILE%"
 
-winget --version >nul 2>&1
+where choco >nul 2>&1
 if %errorLevel% neq 0 (
-    echo Winget not found. Installing Windows Package Manager...
-    echo Winget not found. Installing... >> "%LOG_FILE%"
-    
-    REM Detect Windows version
-    for /f "tokens=4-5 delims=. " %%i in ('ver') do set VERSION=%%i.%%j
-    
-    REM Download and install App Installer (contains winget)
-    echo Downloading App Installer package...
-    powershell -Command "& {Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe}" >> "%LOG_FILE%" 2>&1
-    
-    if !errorLevel! neq 0 (
-        echo Attempting alternative installation method...
-        powershell -Command "& {Invoke-WebRequest -Uri 'https://aka.ms/getwinget' -OutFile '%TEMP%\Microsoft.DesktopAppInstaller.msixbundle'; Add-AppxPackage '%TEMP%\Microsoft.DesktopAppInstaller.msixbundle'}" >> "%LOG_FILE%" 2>&1
-    )
-    
+    echo Chocolatey not found. Installing Chocolatey...
+    echo Chocolatey not found. Installing... >> "%LOG_FILE%"
+
+    REM Install Chocolatey
+    echo Installing Chocolatey Package Manager...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" >> "%LOG_FILE%" 2>&1
+
+    REM Refresh environment
+    call :RefreshPath
+
     REM Verify installation
     timeout /t 5 /nobreak >nul
-    winget --version >nul 2>&1
+    where choco >nul 2>&1
     if !errorLevel! neq 0 (
-        echo ERROR: Failed to install winget. Please install manually from Microsoft Store.
-        echo ERROR: Winget installation failed >> "%LOG_FILE%"
+        echo ERROR: Failed to install Chocolatey. Please install manually.
+        echo ERROR: Chocolatey installation failed >> "%LOG_FILE%"
         pause
         exit /b 1
     )
-    echo Winget installed successfully!
-    echo Winget installed successfully >> "%LOG_FILE%"
+    echo Chocolatey installed successfully!
+    echo Chocolatey installed successfully >> "%LOG_FILE%"
 ) else (
-    for /f "tokens=*" %%a in ('winget --version') do set WINGET_VER=%%a
-    echo Winget already installed: !WINGET_VER!
-    echo Winget already installed: !WINGET_VER! >> "%LOG_FILE%"
+    for /f "tokens=*" %%a in ('choco --version') do set CHOCO_VER=%%a
+    echo Chocolatey already installed: !CHOCO_VER!
+    echo Chocolatey already installed: !CHOCO_VER! >> "%LOG_FILE%"
 )
 echo.
 
@@ -91,13 +86,15 @@ REM Step 2: Install Python 3.12
 REM ========================================================================
 echo [2/13] Installing Python 3.12...
 echo [2/13] Installing Python 3.12... >> "%LOG_FILE%"
-winget install --id Python.Python.3.12 --exact --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install python312 -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Python 3.12 installed successfully!
+    echo Python 3.12 installed successfully >> "%LOG_FILE%"
 ) else (
-    echo Python 3.12 installation completed with code: %errorLevel% ^(may already be installed^)
+    echo Python 3.12 installation completed with code: %errorLevel%
+    echo Python 3.12 installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo Python 3.12 installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -105,13 +102,15 @@ REM Step 3: Install Node.js
 REM ========================================================================
 echo [3/13] Installing Node.js...
 echo [3/13] Installing Node.js... >> "%LOG_FILE%"
-winget install --id OpenJS.NodeJS --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install nodejs -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Node.js installed successfully!
+    echo Node.js installed successfully >> "%LOG_FILE%"
 ) else (
-    echo Node.js installation completed with code: %errorLevel% ^(may already be installed^)
+    echo Node.js installation completed with code: %errorLevel%
+    echo Node.js installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo Node.js installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -119,13 +118,15 @@ REM Step 4: Install Git
 REM ========================================================================
 echo [4/13] Installing Git...
 echo [4/13] Installing Git... >> "%LOG_FILE%"
-winget install --id Git.Git --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install git -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Git installed successfully!
+    echo Git installed successfully >> "%LOG_FILE%"
 ) else (
-    echo Git installation completed with code: %errorLevel% ^(may already be installed^)
+    echo Git installation completed with code: %errorLevel%
+    echo Git installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo Git installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -133,13 +134,15 @@ REM Step 5: Install GitHub CLI
 REM ========================================================================
 echo [5/13] Installing GitHub CLI...
 echo [5/13] Installing GitHub CLI... >> "%LOG_FILE%"
-winget install --id GitHub.cli --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install gh -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo GitHub CLI installed successfully!
+    echo GitHub CLI installed successfully >> "%LOG_FILE%"
 ) else (
-    echo GitHub CLI installation completed with code: %errorLevel% ^(may already be installed^)
+    echo GitHub CLI installation completed with code: %errorLevel%
+    echo GitHub CLI installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo GitHub CLI installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -147,13 +150,15 @@ REM Step 6: Install Docker Desktop
 REM ========================================================================
 echo [6/13] Installing Docker Desktop...
 echo [6/13] Installing Docker Desktop... >> "%LOG_FILE%"
-winget install --id Docker.DockerDesktop --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install docker-desktop -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Docker Desktop installed successfully!
+    echo Docker Desktop installed successfully >> "%LOG_FILE%"
 ) else (
-    echo Docker Desktop installation completed with code: %errorLevel% ^(may already be installed^)
+    echo Docker Desktop installation completed with code: %errorLevel%
+    echo Docker Desktop installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo Docker Desktop installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -161,13 +166,15 @@ REM Step 7: Install kubectl
 REM ========================================================================
 echo [7/13] Installing kubectl...
 echo [7/13] Installing kubectl... >> "%LOG_FILE%"
-winget install --id Kubernetes.kubectl --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install kubernetes-cli -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo kubectl installed successfully!
+    echo kubectl installed successfully >> "%LOG_FILE%"
 ) else (
-    echo kubectl installation completed with code: %errorLevel% ^(may already be installed^)
+    echo kubectl installation completed with code: %errorLevel%
+    echo kubectl installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo kubectl installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -175,13 +182,15 @@ REM Step 8: Install Visual Studio Code
 REM ========================================================================
 echo [8/13] Installing Visual Studio Code...
 echo [8/13] Installing Visual Studio Code... >> "%LOG_FILE%"
-winget install --id Microsoft.VisualStudioCode --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install vscode -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Visual Studio Code installed successfully!
+    echo Visual Studio Code installed successfully >> "%LOG_FILE%"
 ) else (
-    echo Visual Studio Code installation completed with code: %errorLevel% ^(may already be installed^)
+    echo Visual Studio Code installation completed with code: %errorLevel%
+    echo Visual Studio Code installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo Visual Studio Code installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -189,13 +198,15 @@ REM Step 9: Install Google Chrome
 REM ========================================================================
 echo [9/13] Installing Google Chrome...
 echo [9/13] Installing Google Chrome... >> "%LOG_FILE%"
-winget install --id Google.Chrome --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install googlechrome -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Google Chrome installed successfully!
+    echo Google Chrome installed successfully >> "%LOG_FILE%"
 ) else (
-    echo Google Chrome installation completed with code: %errorLevel% ^(may already be installed^)
+    echo Google Chrome installation completed with code: %errorLevel%
+    echo Google Chrome installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo Google Chrome installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -203,13 +214,15 @@ REM Step 10: Install Multipass
 REM ========================================================================
 echo [10/13] Installing Multipass...
 echo [10/13] Installing Multipass... >> "%LOG_FILE%"
-winget install --id Canonical.Multipass --silent --accept-package-agreements --accept-source-agreements >> "%LOG_FILE%" 2>&1
+choco install multipass -y --force >> "%LOG_FILE%" 2>&1
 if %errorLevel% equ 0 (
     echo Multipass installed successfully!
+    echo Multipass installed successfully >> "%LOG_FILE%"
 ) else (
-    echo Multipass installation completed with code: %errorLevel% ^(may already be installed^)
+    echo Multipass installation completed with code: %errorLevel%
+    echo Multipass installation exit code: %errorLevel% >> "%LOG_FILE%"
 )
-echo Multipass installation exit code: %errorLevel% >> "%LOG_FILE%"
+call :RefreshPath
 echo.
 
 REM ========================================================================
@@ -290,7 +303,7 @@ timeout /t 3 /nobreak >nul
 code --version >nul 2>&1
 if %errorLevel% equ 0 (
     echo Installing VS Code extensions...
-    
+
     call :InstallExtension "ms-vscode-remote.remote-containers" "Remote - Containers"
     call :InstallExtension "github.copilot" "GitHub Copilot"
     call :InstallExtension "github.copilot-chat" "GitHub Copilot Chat"
@@ -307,7 +320,7 @@ if %errorLevel% equ 0 (
     call :InstallExtension "qwtel.sqlite-viewer" "SQLite Viewer"
     call :InstallExtension "ms-vscode-remote.remote-wsl" "WSL"
     call :InstallExtension "redhat.vscode-yaml" "YAML"
-    
+
     echo All VS Code extensions installation completed!
     echo VS Code extensions installation completed >> "%LOG_FILE%"
 ) else (
@@ -338,10 +351,10 @@ set DOCKER_SETTINGS=%APPDATA%\Docker\settings.json
 if exist "%DOCKER_SETTINGS%" (
     echo Docker settings found. Creating backup...
     copy "%DOCKER_SETTINGS%" "%DOCKER_SETTINGS%.backup" >nul 2>&1
-    
+
     REM Use PowerShell to modify JSON
     powershell -Command "& {$json = Get-Content '%DOCKER_SETTINGS%' | ConvertFrom-Json; $json | Add-Member -NotePropertyName 'kubernetesEnabled' -NotePropertyValue $true -Force; $json | ConvertTo-Json -Depth 32 | Set-Content '%DOCKER_SETTINGS%'}" >> "%LOG_FILE%" 2>&1
-    
+
     if !errorLevel! equ 0 (
         echo Kubernetes enabled in Docker Desktop settings.
         echo Please restart Docker Desktop for changes to take effect.
