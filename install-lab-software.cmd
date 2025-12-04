@@ -100,15 +100,23 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Python 3.12"
 
-echo [2/15] Installing Python 3.12...
-echo [2/15] Installing Python 3.12... >> "%LOG_FILE%"
-choco install python312 -y --force >> "%LOG_FILE%" 2>&1
+echo [2/15] Checking Python 3.12...
+echo [2/15] Checking Python 3.12... >> "%LOG_FILE%"
+
+python --version 2>nul | findstr "Python 3.12" >nul 2>&1
 if %errorLevel% equ 0 (
-    echo Python 3.12 installed successfully!
-    echo Python 3.12 installed successfully >> "%LOG_FILE%"
+    echo Python 3.12 already installed. Skipping...
+    echo Python 3.12 already installed >> "%LOG_FILE%"
 ) else (
-    echo Python 3.12 installation completed with code: %errorLevel%
-    echo Python 3.12 installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing Python 3.12...
+    choco install python312 -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo Python 3.12 installed successfully!
+        echo Python 3.12 installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo Python 3.12 installation completed with code: !errorLevel!
+        echo Python 3.12 installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -119,15 +127,24 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Node.js"
 
-echo [3/15] Installing Node.js...
-echo [3/15] Installing Node.js... >> "%LOG_FILE%"
-choco install nodejs -y --force >> "%LOG_FILE%" 2>&1
+echo [3/15] Checking Node.js...
+echo [3/15] Checking Node.js... >> "%LOG_FILE%"
+
+node --version >nul 2>&1
 if %errorLevel% equ 0 (
-    echo Node.js installed successfully!
-    echo Node.js installed successfully >> "%LOG_FILE%"
+    for /f "tokens=*" %%a in ('node --version') do set NODE_VER=%%a
+    echo Node.js already installed: !NODE_VER!. Skipping...
+    echo Node.js already installed: !NODE_VER! >> "%LOG_FILE%"
 ) else (
-    echo Node.js installation completed with code: %errorLevel%
-    echo Node.js installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing Node.js...
+    choco install nodejs -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo Node.js installed successfully!
+        echo Node.js installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo Node.js installation completed with code: !errorLevel!
+        echo Node.js installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -138,15 +155,24 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Git"
 
-echo [4/15] Installing Git...
-echo [4/15] Installing Git... >> "%LOG_FILE%"
-choco install git -y --force >> "%LOG_FILE%" 2>&1
+echo [4/15] Checking Git...
+echo [4/15] Checking Git... >> "%LOG_FILE%"
+
+git --version >nul 2>&1
 if %errorLevel% equ 0 (
-    echo Git installed successfully!
-    echo Git installed successfully >> "%LOG_FILE%"
+    for /f "tokens=*" %%a in ('git --version') do set GIT_VER=%%a
+    echo Git already installed: !GIT_VER!. Skipping...
+    echo Git already installed: !GIT_VER! >> "%LOG_FILE%"
 ) else (
-    echo Git installation completed with code: %errorLevel%
-    echo Git installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing Git...
+    choco install git -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo Git installed successfully!
+        echo Git installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo Git installation completed with code: !errorLevel!
+        echo Git installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -157,15 +183,24 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing GitHub CLI"
 
-echo [5/15] Installing GitHub CLI...
-echo [5/15] Installing GitHub CLI... >> "%LOG_FILE%"
-choco install gh -y --force >> "%LOG_FILE%" 2>&1
+echo [5/15] Checking GitHub CLI...
+echo [5/15] Checking GitHub CLI... >> "%LOG_FILE%"
+
+gh --version >nul 2>&1
 if %errorLevel% equ 0 (
-    echo GitHub CLI installed successfully!
-    echo GitHub CLI installed successfully >> "%LOG_FILE%"
+    for /f "tokens=*" %%a in ('gh --version ^| findstr /C:"gh version"') do set GH_VER=%%a
+    echo GitHub CLI already installed: !GH_VER!. Skipping...
+    echo GitHub CLI already installed >> "%LOG_FILE%"
 ) else (
-    echo GitHub CLI installation completed with code: %errorLevel%
-    echo GitHub CLI installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing GitHub CLI...
+    choco install gh -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo GitHub CLI installed successfully!
+        echo GitHub CLI installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo GitHub CLI installation completed with code: !errorLevel!
+        echo GitHub CLI installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -176,15 +211,24 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Docker Desktop"
 
-echo [6/15] Installing Docker Desktop...
-echo [6/15] Installing Docker Desktop... >> "%LOG_FILE%"
-choco install docker-desktop -y --force >> "%LOG_FILE%" 2>&1
+echo [6/15] Checking Docker Desktop...
+echo [6/15] Checking Docker Desktop... >> "%LOG_FILE%"
+
+docker --version >nul 2>&1
 if %errorLevel% equ 0 (
-    echo Docker Desktop installed successfully!
-    echo Docker Desktop installed successfully >> "%LOG_FILE%"
+    for /f "tokens=*" %%a in ('docker --version') do set DOCKER_VER=%%a
+    echo Docker Desktop already installed: !DOCKER_VER!. Skipping...
+    echo Docker Desktop already installed >> "%LOG_FILE%"
 ) else (
-    echo Docker Desktop installation completed with code: %errorLevel%
-    echo Docker Desktop installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing Docker Desktop...
+    choco install docker-desktop -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo Docker Desktop installed successfully!
+        echo Docker Desktop installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo Docker Desktop installation completed with code: !errorLevel!
+        echo Docker Desktop installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -195,15 +239,23 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing kubectl"
 
-echo [7/15] Installing kubectl...
-echo [7/15] Installing kubectl... >> "%LOG_FILE%"
-choco install kubernetes-cli -y --force >> "%LOG_FILE%" 2>&1
+echo [7/15] Checking kubectl...
+echo [7/15] Checking kubectl... >> "%LOG_FILE%"
+
+kubectl version --client >nul 2>&1
 if %errorLevel% equ 0 (
-    echo kubectl installed successfully!
-    echo kubectl installed successfully >> "%LOG_FILE%"
+    echo kubectl already installed. Skipping...
+    echo kubectl already installed >> "%LOG_FILE%"
 ) else (
-    echo kubectl installation completed with code: %errorLevel%
-    echo kubectl installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing kubectl...
+    choco install kubernetes-cli -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo kubectl installed successfully!
+        echo kubectl installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo kubectl installation completed with code: !errorLevel!
+        echo kubectl installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -214,15 +266,25 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Visual Studio Code"
 
-echo [8/15] Installing Visual Studio Code...
-echo [8/15] Installing Visual Studio Code... >> "%LOG_FILE%"
-choco install vscode -y --force >> "%LOG_FILE%" 2>&1
+echo [8/15] Checking Visual Studio Code...
+echo [8/15] Checking Visual Studio Code... >> "%LOG_FILE%"
+
+code --version >nul 2>&1
 if %errorLevel% equ 0 (
-    echo Visual Studio Code installed successfully!
-    echo Visual Studio Code installed successfully >> "%LOG_FILE%"
+    for /f "tokens=*" %%a in ('code --version ^| findstr /R "[0-9]"') do set CODE_VER=%%a & goto :code_found
+    :code_found
+    echo Visual Studio Code already installed: !CODE_VER!. Skipping...
+    echo Visual Studio Code already installed >> "%LOG_FILE%"
 ) else (
-    echo Visual Studio Code installation completed with code: %errorLevel%
-    echo Visual Studio Code installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing Visual Studio Code...
+    choco install vscode -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo Visual Studio Code installed successfully!
+        echo Visual Studio Code installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo Visual Studio Code installation completed with code: !errorLevel!
+        echo Visual Studio Code installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -233,15 +295,28 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Google Chrome"
 
-echo [9/15] Installing Google Chrome...
-echo [9/15] Installing Google Chrome... >> "%LOG_FILE%"
-choco install googlechrome -y --force >> "%LOG_FILE%" 2>&1
-if %errorLevel% equ 0 (
-    echo Google Chrome installed successfully!
-    echo Google Chrome installed successfully >> "%LOG_FILE%"
+echo [9/15] Checking Google Chrome...
+echo [9/15] Checking Google Chrome... >> "%LOG_FILE%"
+
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
+    echo Google Chrome already installed. Skipping...
+    echo Google Chrome already installed >> "%LOG_FILE%"
+) else if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
+    echo Google Chrome already installed. Skipping...
+    echo Google Chrome already installed >> "%LOG_FILE%"
+) else if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" (
+    echo Google Chrome already installed. Skipping...
+    echo Google Chrome already installed >> "%LOG_FILE%"
 ) else (
-    echo Google Chrome installation completed with code: %errorLevel%
-    echo Google Chrome installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing Google Chrome...
+    choco install googlechrome -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo Google Chrome installed successfully!
+        echo Google Chrome installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo Google Chrome installation completed with code: !errorLevel!
+        echo Google Chrome installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -290,15 +365,24 @@ REM ========================================================================
 set /a CURRENT_STEP+=1
 call :DrawProgressBar %CURRENT_STEP% %TOTAL_STEPS% "Installing Multipass"
 
-echo [12/15] Installing Multipass...
-echo [12/15] Installing Multipass... >> "%LOG_FILE%"
-choco install multipass -y --force >> "%LOG_FILE%" 2>&1
+echo [12/15] Checking Multipass...
+echo [12/15] Checking Multipass... >> "%LOG_FILE%"
+
+multipass version >nul 2>&1
 if %errorLevel% equ 0 (
-    echo Multipass installed successfully!
-    echo Multipass installed successfully >> "%LOG_FILE%"
+    for /f "tokens=*" %%a in ('multipass version ^| findstr "multipass"') do set MP_VER=%%a
+    echo Multipass already installed: !MP_VER!. Skipping...
+    echo Multipass already installed >> "%LOG_FILE%"
 ) else (
-    echo Multipass installation completed with code: %errorLevel%
-    echo Multipass installation exit code: %errorLevel% >> "%LOG_FILE%"
+    echo Installing Multipass...
+    choco install multipass -y >> "%LOG_FILE%" 2>&1
+    if !errorLevel! equ 0 (
+        echo Multipass installed successfully!
+        echo Multipass installed successfully >> "%LOG_FILE%"
+    ) else (
+        echo Multipass installation completed with code: !errorLevel!
+        echo Multipass installation exit code: !errorLevel! >> "%LOG_FILE%"
+    )
 )
 call :RefreshPath
 echo.
@@ -340,6 +424,21 @@ if exist "%TEMP%\wsl_update_x64.msi" (
 ) else (
     echo WSL2 kernel download failed. Will be available via Windows Update.
     echo WSL2 kernel download failed >> "%LOG_FILE%"
+)
+
+REM Set WSL2 as default
+echo Setting WSL2 as default version...
+wsl --set-default-version 2 >> "%LOG_FILE%" 2>&1
+
+REM Update WSL to latest version
+echo Updating WSL to latest version...
+wsl --update >> "%LOG_FILE%" 2>&1
+if %errorLevel% equ 0 (
+    echo WSL updated successfully.
+    echo WSL updated successfully >> "%LOG_FILE%"
+) else (
+    echo WSL update will be available after system restart.
+    echo WSL update pending restart >> "%LOG_FILE%"
 )
 
 echo.
