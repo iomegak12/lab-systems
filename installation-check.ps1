@@ -1,277 +1,369 @@
-# Lab System Testing Script
-# Tests all installed software components and reports status
-# Run as Administrator for best results
-
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Lab Environment Verification Suite — AI Workshop for Database Teams
+.DESCRIPTION
+    Verifies all required software is installed and operational.
+    Standard mode (default) : 12 core component checks.
+    Advanced mode (-Advanced): adds SQL Server 2022 + Postman (14 checks total).
+.PARAMETER Advanced
+    Run extended checks: SQL Server 2022 and Postman, in addition to all core checks.
+.PARAMETER QuickTest
+    Skip optional sub-tests (pip, npm, Docker hello-world) for a faster run.
+.PARAMETER Detailed
+    Export a full JSON report to the working directory after completion.
+.EXAMPLE
+    .\installation-check.ps1
+    .\installation-check.ps1 -Advanced
+    .\installation-check.ps1 -Advanced -Detailed
+    .\installation-check.ps1 -QuickTest
+#>
 param(
-    [switch]$Detailed = $false,
+    [switch]$Advanced  = $false,
+    [switch]$Detailed  = $false,
     [switch]$QuickTest = $false
 )
 
-# Color coding for output
-function Write-Status {
-    param($Message, $Status, $Details = "")
+$ErrorActionPreference = "Continue"
 
-    $timestamp = Get-Date -Format "HH:mm:ss"
+# ══════════════════════════════════════════════════════════════════════════════
+#  UI HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+function Write-Banner {
+    $modeLabel   = if ($Advanced) { "Advanced  (SQL Server 2022 + Postman included)" } else { "Standard" }
+    $totalChecks = if ($Advanced) { 14 } else { 12 }
+    $startedAt   = Get-Date -Format "yyyy-MM-dd  HH:mm:ss"
+    $w           = 66
+
+    Write-Host ""
+    Write-Host ("  ╔" + ("═" * $w) + "╗") -ForegroundColor Cyan
+    Write-Host ("  ║" + (" " * $w) + "║") -ForegroundColor Cyan
+    Write-Host ("  ║" + "  LAB ENVIRONMENT VERIFICATION SUITE".PadRight($w) + "║") -ForegroundColor White
+    Write-Host ("  ║" + "  AI Workshop for Database Teams  ·  Windows Setup".PadRight($w) + "║") -ForegroundColor Cyan
+    Write-Host ("  ║" + (" " * $w) + "║") -ForegroundColor Cyan
+    Write-Host ("  ╠" + ("═" * $w) + "╣") -ForegroundColor DarkCyan
+    Write-Host ("  ║" + ("  Mode     :  " + $modeLabel).PadRight($w) + "║") -ForegroundColor Yellow
+    Write-Host ("  ║" + ("  Checks   :  $totalChecks components").PadRight($w) + "║") -ForegroundColor Gray
+    Write-Host ("  ║" + ("  Started  :  $startedAt").PadRight($w) + "║") -ForegroundColor Gray
+    Write-Host ("  ╚" + ("═" * $w) + "╝") -ForegroundColor Cyan
+    Write-Host ""
+}
+
+function Write-SectionHeader {
+    param([string]$Title)
+    $pad  = [math]::Max(2, 52 - $Title.Length)
+    $line = "─" * $pad
+    Write-Host ""
+    Write-Host "  ▶  " -NoNewline -ForegroundColor DarkYellow
+    Write-Host $Title -NoNewline -ForegroundColor Magenta
+    Write-Host "  $line" -ForegroundColor DarkGray
+    Write-Host ""
+}
+
+function Write-Probing {
+    param([string]$Name)
+    Write-Host "      Checking $Name ..." -ForegroundColor DarkGray
+}
+
+function Write-Result {
+    param(
+        [string]$Label,
+        [ValidateSet("PASS","FAIL","WARN","INFO","SKIP")]
+        [string]$Status,
+        [string]$Detail = ""
+    )
+
+    Write-Host "  " -NoNewline
     switch ($Status) {
         "PASS" {
-            Write-Host "[$timestamp] " -NoNewline -ForegroundColor Gray
-            Write-Host "✓ PASS" -NoNewline -ForegroundColor Green
-            Write-Host " - $Message" -ForegroundColor White
+            Write-Host " PASS " -BackgroundColor DarkGreen  -ForegroundColor White -NoNewline
+            Write-Host "  $Label" -ForegroundColor White
         }
         "FAIL" {
-            Write-Host "[$timestamp] " -NoNewline -ForegroundColor Gray
-            Write-Host "✗ FAIL" -NoNewline -ForegroundColor Red
-            Write-Host " - $Message" -ForegroundColor White
+            Write-Host " FAIL " -BackgroundColor DarkRed    -ForegroundColor White -NoNewline
+            Write-Host "  $Label" -ForegroundColor White
         }
         "WARN" {
-            Write-Host "[$timestamp] " -NoNewline -ForegroundColor Gray
-            Write-Host "⚠ WARN" -NoNewline -ForegroundColor Yellow
-            Write-Host " - $Message" -ForegroundColor White
+            Write-Host " WARN " -BackgroundColor DarkYellow -ForegroundColor Black -NoNewline
+            Write-Host "  $Label" -ForegroundColor White
         }
         "INFO" {
-            Write-Host "[$timestamp] " -NoNewline -ForegroundColor Gray
-            Write-Host "ℹ INFO" -NoNewline -ForegroundColor Cyan
-            Write-Host " - $Message" -ForegroundColor White
+            Write-Host " INFO " -BackgroundColor DarkCyan   -ForegroundColor Black -NoNewline
+            Write-Host "  $Label" -ForegroundColor DarkGray
+        }
+        "SKIP" {
+            Write-Host " SKIP " -BackgroundColor DarkGray   -ForegroundColor White -NoNewline
+            Write-Host "  $Label" -ForegroundColor DarkGray
         }
     }
 
-    if ($Detailed -and $Details) {
-        Write-Host "    $Details" -ForegroundColor Gray
+    if ($Detail) {
+        Write-Host "          └─ $Detail" -ForegroundColor DarkGray
     }
 }
 
-function Write-Section {
-    param([string]$Title)
-    Write-Host "`n  ── $Title ──" -ForegroundColor DarkCyan
+function Write-SubResult {
+    param(
+        [string]$Label,
+        [ValidateSet("PASS","FAIL","WARN","INFO")]
+        [string]$Status,
+        [string]$Detail = ""
+    )
+
+    Write-Host "  " -NoNewline
+    switch ($Status) {
+        "PASS" { Write-Host "    ✓  " -NoNewline -ForegroundColor Green  }
+        "FAIL" { Write-Host "    ✗  " -NoNewline -ForegroundColor Red    }
+        "WARN" { Write-Host "    ⚠  " -NoNewline -ForegroundColor Yellow }
+        "INFO" { Write-Host "    ·  " -NoNewline -ForegroundColor Cyan   }
+    }
+    Write-Host $Label -ForegroundColor Gray
+    if ($Detail) {
+        Write-Host "             └─ $Detail" -ForegroundColor DarkGray
+    }
 }
 
-# Test results tracking
-$TestResults = @{}
+function Write-Divider {
+    Write-Host ("  " + ("─" * 66)) -ForegroundColor DarkGray
+}
 
-# Fixed Test-Command: null guard on timeout + no Invoke-Expression
+# ══════════════════════════════════════════════════════════════════════════════
+#  CORE ENGINE
+# ══════════════════════════════════════════════════════════════════════════════
+
+$TestResults = [ordered]@{}
+
 function Test-Command {
-    param($Command, $Name, $ExpectedPattern = "", $TimeoutSeconds = 30)
+    param(
+        [string]$Command,
+        [string]$ExpectedPattern = "",
+        [int]   $TimeoutSeconds  = 30
+    )
 
     try {
         $job = Start-Job -ScriptBlock {
             param($cmd)
             try {
-                $output = & cmd /c $cmd 2>&1
-                return @{Success = $true; Output = ($output | Out-String)}
+                $out = & cmd /c $cmd 2>&1
+                return @{ Success = $true; Output = ($out | Out-String) }
             }
             catch {
-                return @{Success = $false; Output = ""; Error = $_.Exception.Message}
+                return @{ Success = $false; Output = ""; Error = $_.Exception.Message }
             }
         } -ArgumentList $Command
 
         $completed = Wait-Job $job -Timeout $TimeoutSeconds
         if ($null -eq $completed) {
             Remove-Job $job -Force
-            return @{Success = $false; Output = ""; Error = "Test timed out after ${TimeoutSeconds}s"}
+            return @{ Success = $false; Output = ""; Error = "Timed out after ${TimeoutSeconds}s" }
         }
 
         $result = Receive-Job $job
         Remove-Job $job -Force
 
         if ($null -eq $result) {
-            return @{Success = $false; Output = ""; Error = "No result returned from job"}
+            return @{ Success = $false; Output = ""; Error = "No result returned" }
         }
 
         if ($result.Success) {
-            $output = $result.Output
-            if ($ExpectedPattern -and $output -notmatch $ExpectedPattern) {
-                return @{Success = $false; Output = $output; Error = "Expected pattern '$ExpectedPattern' not found"}
+            $out = $result.Output
+            if ($ExpectedPattern -and ($out -notmatch $ExpectedPattern)) {
+                return @{ Success = $false; Output = $out; Error = "Pattern '$ExpectedPattern' not found" }
             }
-            return @{Success = $true; Output = $output}
+            return @{ Success = $true; Output = $out }
         }
-        else {
-            return @{Success = $false; Output = ""; Error = $result.Error}
-        }
+
+        return @{ Success = $false; Output = ""; Error = $result.Error }
     }
     catch {
-        return @{Success = $false; Output = ""; Error = $_.Exception.Message}
+        return @{ Success = $false; Output = ""; Error = $_.Exception.Message }
     }
 }
 
-# Header
+# ══════════════════════════════════════════════════════════════════════════════
+#  START
+# ══════════════════════════════════════════════════════════════════════════════
+
 Clear-Host
-Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "                    LAB SYSTEM TESTING SCRIPT" -ForegroundColor Cyan
-Write-Host "         AI Workshop for Database Teams — Environment Check" -ForegroundColor Cyan
-Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host ""
+Write-Banner
 
-#region Core Development Tools
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 1 — CORE DEVELOPMENT TOOLS
+# ──────────────────────────────────────────────────────────────────────────────
 
-Write-Section "Core Development Tools"
+Write-SectionHeader "Core Development Tools"
 
-# Test 1: Python 3.12
-Write-Host "`nTesting Python 3.12..." -ForegroundColor Yellow
-$pythonTest = Test-Command "python --version" "Python" "Python 3\.12"
-if ($pythonTest.Success) {
-    $parts = $pythonTest.Output.Trim() -split "\s+"
-    $version = if ($parts.Count -ge 2) { $parts[1] } else { $pythonTest.Output.Trim() }
-    Write-Status "Python $version" "PASS" $pythonTest.Output.Trim()
+# ── Python ────────────────────────────────────────────────────────────────────
+Write-Probing "Python 3.12"
+$r = Test-Command "python --version" "Python 3\.12"
+if ($r.Success) {
+    $parts   = $r.Output.Trim() -split "\s+"
+    $version = if ($parts.Count -ge 2) { $parts[1] } else { $r.Output.Trim() }
+    Write-Result "Python $version" "PASS"
     $TestResults["Python"] = "PASS"
 
-    # Test pip
     if (-not $QuickTest) {
-        $pipTest = Test-Command "pip --version" "Pip"
-        if ($pipTest.Success) {
-            $pipVersion = ($pipTest.Output.Trim() -split "\s+")[1]
-            Write-Status "pip $pipVersion" "PASS" $pipTest.Output.Trim()
+        $pip = Test-Command "pip --version"
+        if ($pip.Success) {
+            $pipVer = ($pip.Output.Trim() -split "\s+") | Select-Object -Index 1
+            Write-SubResult "pip $pipVer" "PASS" $pip.Output.Trim()
         }
         else {
-            Write-Status "pip not functional" "FAIL" $pipTest.Error
+            Write-SubResult "pip — not functional" "FAIL" $pip.Error
         }
     }
 }
 else {
-    Write-Status "Python 3.12 not found or incorrect version" "FAIL" $pythonTest.Error
+    Write-Result "Python 3.12 — not found or wrong version" "FAIL" $r.Error
     $TestResults["Python"] = "FAIL"
 }
 
-# Test 2: Node.js
-Write-Host "`nTesting Node.js..." -ForegroundColor Yellow
-$nodeTest = Test-Command "node --version" "Node.js"
-if ($nodeTest.Success) {
-    $version = $nodeTest.Output.Trim()
-    Write-Status "Node.js $version" "PASS" $version
+Write-Host ""
+
+# ── Node.js ───────────────────────────────────────────────────────────────────
+Write-Probing "Node.js"
+$r = Test-Command "node --version"
+if ($r.Success) {
+    $version = $r.Output.Trim()
+    Write-Result "Node.js $version" "PASS"
     $TestResults["NodeJS"] = "PASS"
 
-    # Test npm
     if (-not $QuickTest) {
-        $npmTest = Test-Command "npm --version" "NPM"
-        if ($npmTest.Success) {
-            Write-Status "npm $($npmTest.Output.Trim())" "PASS" "npm version: $($npmTest.Output.Trim())"
+        $npm = Test-Command "npm --version"
+        if ($npm.Success) {
+            Write-SubResult "npm $($npm.Output.Trim())" "PASS"
         }
         else {
-            Write-Status "npm not functional" "FAIL" $npmTest.Error
+            Write-SubResult "npm — not functional" "FAIL" $npm.Error
         }
     }
 }
 else {
-    Write-Status "Node.js not found" "FAIL" $nodeTest.Error
+    Write-Result "Node.js — not found" "FAIL" $r.Error
     $TestResults["NodeJS"] = "FAIL"
 }
 
-# Test 3: Git
-Write-Host "`nTesting Git..." -ForegroundColor Yellow
-$gitTest = Test-Command "git --version" "Git"
-if ($gitTest.Success) {
-    $parts = $gitTest.Output.Trim() -split "\s+"
-    $version = if ($parts.Count -ge 3) { $parts[2] } else { $gitTest.Output.Trim() }
-    Write-Status "Git $version" "PASS" $gitTest.Output.Trim()
+Write-Host ""
+
+# ── Git ───────────────────────────────────────────────────────────────────────
+Write-Probing "Git"
+$r = Test-Command "git --version"
+if ($r.Success) {
+    $parts   = $r.Output.Trim() -split "\s+"
+    $version = if ($parts.Count -ge 3) { $parts[2] } else { $r.Output.Trim() }
+    Write-Result "Git $version" "PASS"
     $TestResults["Git"] = "PASS"
 }
 else {
-    Write-Status "Git not found" "FAIL" $gitTest.Error
+    Write-Result "Git — not found" "FAIL" $r.Error
     $TestResults["Git"] = "FAIL"
 }
 
-# Test 4: GitHub CLI
-Write-Host "`nTesting GitHub CLI..." -ForegroundColor Yellow
-$ghTest = Test-Command "gh --version" "GitHub CLI"
-if ($ghTest.Success) {
-    $firstLine = ($ghTest.Output -split "`n")[0].Trim()
-    Write-Status "GitHub CLI — $firstLine" "PASS" $firstLine
+Write-Host ""
+
+# ── GitHub CLI ────────────────────────────────────────────────────────────────
+Write-Probing "GitHub CLI"
+$r = Test-Command "gh --version"
+if ($r.Success) {
+    $firstLine = ($r.Output -split "`n")[0].Trim()
+    Write-Result "GitHub CLI  —  $firstLine" "PASS"
     $TestResults["GitHubCLI"] = "PASS"
 }
 else {
-    Write-Status "GitHub CLI not found" "FAIL" $ghTest.Error
+    Write-Result "GitHub CLI — not found" "FAIL" $r.Error
     $TestResults["GitHubCLI"] = "FAIL"
 }
 
-#endregion
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 2 — CONTAINERS & ORCHESTRATION
+# ──────────────────────────────────────────────────────────────────────────────
 
-#region Containers & Orchestration
+Write-SectionHeader "Containers & Orchestration"
 
-Write-Section "Containers & Orchestration"
+# ── Docker ────────────────────────────────────────────────────────────────────
+Write-Probing "Docker Desktop"
+$r = Test-Command "docker --version"
+if ($r.Success) {
+    $version = $r.Output.Trim()
+    Write-Result "Docker Engine  —  $version" "PASS"
 
-# Test 5: Docker Desktop
-Write-Host "`nTesting Docker..." -ForegroundColor Yellow
-$dockerTest = Test-Command "docker --version" "Docker"
-if ($dockerTest.Success) {
-    $version = $dockerTest.Output.Trim()
-    Write-Status "Docker Engine — $version" "PASS" $version
-
-    # Test Docker daemon
-    $dockerInfoTest = Test-Command "docker info" "Docker Info" "" 10
-    if ($dockerInfoTest.Success) {
-        Write-Status "Docker daemon is running" "PASS"
+    $daemon = Test-Command "docker info" "" 10
+    if ($daemon.Success) {
+        Write-SubResult "Docker daemon  —  running" "PASS"
         $TestResults["Docker"] = "PASS"
 
-        # Test hello-world if not quick test
         if (-not $QuickTest) {
-            Write-Status "Testing Docker functionality (pulling hello-world)..." "INFO"
-            $dockerHelloTest = Test-Command "docker run --rm hello-world" "Docker Hello World" "" 60
-            if ($dockerHelloTest.Success) {
-                Write-Status "Docker container execution" "PASS" "hello-world container ran successfully"
+            Write-SubResult "Pulling hello-world container ..." "INFO"
+            $hello = Test-Command "docker run --rm hello-world" "" 60
+            if ($hello.Success) {
+                Write-SubResult "Container execution  —  hello-world ran successfully" "PASS"
             }
             else {
-                Write-Status "Docker container execution" "WARN" "Could not run hello-world container"
+                Write-SubResult "Container execution  —  could not run hello-world" "WARN"
             }
         }
     }
     else {
-        Write-Status "Docker daemon not running" "FAIL" "Start Docker Desktop"
+        Write-SubResult "Docker daemon  —  not running" "FAIL" "Launch Docker Desktop and wait for it to start"
         $TestResults["Docker"] = "FAIL"
     }
 }
 else {
-    Write-Status "Docker not found" "FAIL" $dockerTest.Error
+    Write-Result "Docker Desktop — not found" "FAIL" $r.Error
     $TestResults["Docker"] = "FAIL"
 }
 
-# Test 6: Kubernetes (kubectl)
-Write-Host "`nTesting Kubernetes..." -ForegroundColor Yellow
-$kubectlTest = Test-Command "kubectl version --client" "Kubectl"
-if ($kubectlTest.Success) {
-    Write-Status "kubectl client installed" "PASS" "Kubernetes CLI available"
+Write-Host ""
 
-    # Test cluster connection
-    $kubeClusterTest = Test-Command "kubectl cluster-info" "Kubernetes Cluster" "" 15
-    if ($kubeClusterTest.Success) {
-        Write-Status "Kubernetes cluster accessible" "PASS" "Cluster is reachable"
+# ── Kubernetes ────────────────────────────────────────────────────────────────
+Write-Probing "Kubernetes (kubectl)"
+$r = Test-Command "kubectl version --client"
+if ($r.Success) {
+    Write-Result "kubectl  —  client installed" "PASS"
+
+    $cluster = Test-Command "kubectl cluster-info" "" 15
+    if ($cluster.Success) {
+        Write-SubResult "Cluster connectivity  —  accessible" "PASS"
         $TestResults["Kubernetes"] = "PASS"
     }
     else {
-        Write-Status "Kubernetes cluster not accessible" "WARN" "Enable Kubernetes in Docker Desktop Settings"
+        Write-SubResult "Cluster connectivity  —  not reachable" "WARN" "Enable Kubernetes in Docker Desktop → Settings → Kubernetes"
         $TestResults["Kubernetes"] = "WARN"
     }
 }
 else {
-    Write-Status "kubectl not found" "FAIL" $kubectlTest.Error
+    Write-Result "kubectl — not found" "FAIL" $r.Error
     $TestResults["Kubernetes"] = "FAIL"
 }
 
-#endregion
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 3 — IDEs & EDITORS
+# ──────────────────────────────────────────────────────────────────────────────
 
-#region IDEs & Editors
+Write-SectionHeader "IDEs & Editors"
 
-Write-Section "IDEs & Editors"
-
-# Test 7: Visual Studio Code
-Write-Host "`nTesting Visual Studio Code..." -ForegroundColor Yellow
-$codeTest = Test-Command "code --version" "VS Code"
-if ($codeTest.Success) {
-    $version = ($codeTest.Output -split "`n")[0].Trim()
-    Write-Status "Visual Studio Code $version" "PASS" $version
+# ── VS Code ───────────────────────────────────────────────────────────────────
+Write-Probing "Visual Studio Code"
+$r = Test-Command "code --version"
+if ($r.Success) {
+    $version = ($r.Output -split "`n")[0].Trim()
+    Write-Result "Visual Studio Code  $version" "PASS"
     $TestResults["VSCode"] = "PASS"
 }
 else {
-    Write-Status "Visual Studio Code not found in PATH" "FAIL" $codeTest.Error
+    Write-Result "Visual Studio Code — not found in PATH" "FAIL" $r.Error
     $TestResults["VSCode"] = "FAIL"
 }
 
-#endregion
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 4 — BROWSERS
+# ──────────────────────────────────────────────────────────────────────────────
 
-#region Browsers
+Write-SectionHeader "Browsers"
 
-Write-Section "Browsers"
-
-# Test 8: Google Chrome
-Write-Host "`nTesting Google Chrome..." -ForegroundColor Yellow
+# ── Google Chrome ─────────────────────────────────────────────────────────────
+Write-Probing "Google Chrome"
 $chromePaths = @(
     "${env:ProgramFiles}\Google\Chrome\Application\chrome.exe",
     "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
@@ -281,8 +373,8 @@ $chromePaths = @(
 $chromeFound = $false
 foreach ($path in $chromePaths) {
     if (Test-Path $path) {
-        $chromeVersion = (Get-ItemProperty $path).VersionInfo.FileVersion
-        Write-Status "Google Chrome $chromeVersion" "PASS" "Installed at: $path"
+        $ver = (Get-ItemProperty $path).VersionInfo.FileVersion
+        Write-Result "Google Chrome  $ver" "PASS" $path
         $TestResults["Chrome"] = "PASS"
         $chromeFound = $true
         break
@@ -290,103 +382,18 @@ foreach ($path in $chromePaths) {
 }
 
 if (-not $chromeFound) {
-    Write-Status "Google Chrome not found" "FAIL" "Check installation"
+    Write-Result "Google Chrome — not found" "FAIL" "Check installation at ${env:ProgramFiles}\Google\Chrome"
     $TestResults["Chrome"] = "FAIL"
 }
 
-#endregion
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 5 — DATABASE TOOLS
+# ──────────────────────────────────────────────────────────────────────────────
 
-#region Database Tools
+Write-SectionHeader "Database Tools"
 
-Write-Section "Database Tools"
-
-# Test 9 (was 12): SQL Server 2022
-Write-Host "`nTesting SQL Server 2022..." -ForegroundColor Yellow
-
-$sqlServerFound = $false
-$sqlServerWarn = $false
-$sqlInstanceName = ""
-$sqlEdition = ""
-$sqlServiceState = ""
-
-try {
-    # Check registry for SQL Server 2022 instances (version 16 = SQL Server 2022)
-    $instanceNamesPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL"
-    if (Test-Path $instanceNamesPath) {
-        $instanceNames = Get-ItemProperty -Path $instanceNamesPath -ErrorAction SilentlyContinue
-
-        foreach ($prop in $instanceNames.PSObject.Properties) {
-            if ($prop.Name -like "PS*" -or $prop.Name -eq "PSChildName" -or
-                $prop.Name -eq "PSParentPath" -or $prop.Name -eq "PSPath" -or
-                $prop.Name -eq "PSProvider") { continue }
-
-            $instanceKey = $prop.Value  # e.g. MSSQL16.SQLEXPRESS
-            if ($instanceKey -like "MSSQL16.*") {
-                # This is a SQL Server 2022 instance
-                $sqlInstanceName = $prop.Name
-                $setupPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceKey\Setup"
-
-                if (Test-Path $setupPath) {
-                    $setupInfo = Get-ItemProperty -Path $setupPath -ErrorAction SilentlyContinue
-                    $sqlEdition = if ($setupInfo.Edition) { $setupInfo.Edition } else { "Unknown Edition" }
-                }
-
-                # Check the Windows service state
-                $serviceName = "MSSQL`$$sqlInstanceName"
-                if ($sqlInstanceName -eq "MSSQLSERVER") { $serviceName = "MSSQLSERVER" }
-
-                $svc = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-                if ($null -eq $svc) {
-                    # Try matching by display name pattern
-                    $svc = Get-Service -ErrorAction SilentlyContinue |
-                        Where-Object { $_.Name -like "MSSQL*" -and $_.DisplayName -like "*SQL Server*" } |
-                        Select-Object -First 1
-                }
-
-                $sqlServiceState = if ($svc) { $svc.Status.ToString() } else { "Unknown" }
-
-                $sqlServerFound = $true
-
-                if ($svc -and $svc.Status -eq "Running") {
-                    Write-Status "SQL Server 2022 [$sqlEdition] (Instance: $sqlInstanceName) — Service: Running" "PASS" `
-                        "Registry key: $instanceKey | Service: $serviceName"
-                    $TestResults["SQLServer2022"] = "PASS"
-                }
-                else {
-                    Write-Status "SQL Server 2022 [$sqlEdition] (Instance: $sqlInstanceName) — Service: $sqlServiceState" "WARN" `
-                        "SQL Server is installed but service is not running. Start via Services.msc or SQL Server Configuration Manager."
-                    $TestResults["SQLServer2022"] = "WARN"
-                    $sqlServerWarn = $true
-                }
-                break
-            }
-        }
-    }
-
-    if (-not $sqlServerFound) {
-        # Fallback: check Windows services for any MSSQL service that looks like 2022
-        $mssqlServices = Get-Service -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -like "MSSQL*" -or $_.DisplayName -like "*SQL Server*" }
-
-        if ($mssqlServices) {
-            Write-Status "SQL Server service found but could not confirm 2022 version via registry" "WARN" `
-                "Services detected: $($mssqlServices.Name -join ', ')"
-            $TestResults["SQLServer2022"] = "WARN"
-        }
-        else {
-            Write-Status "SQL Server 2022 not found" "FAIL" `
-                "Install SQL Server 2022 Developer Edition from https://go.microsoft.com/fwlink/p/?linkid=2215158"
-            $TestResults["SQLServer2022"] = "FAIL"
-        }
-    }
-}
-catch {
-    Write-Status "SQL Server 2022 check encountered an error" "FAIL" $_.Exception.Message
-    $TestResults["SQLServer2022"] = "FAIL"
-}
-
-# Test 10 (was 14): SQL Server Management Studio
-Write-Host "`nTesting SQL Server Management Studio (SSMS)..." -ForegroundColor Yellow
+# ── SQL Server Management Studio (always) ─────────────────────────────────────
+Write-Probing "SQL Server Management Studio (SSMS)"
 
 $ssmsPaths = @(
     "${env:ProgramFiles(x86)}\Microsoft SQL Server Management Studio 20\Common7\IDE\Ssms.exe",
@@ -394,50 +401,45 @@ $ssmsPaths = @(
     "${env:ProgramFiles}\Microsoft SQL Server Management Studio 20\Common7\IDE\Ssms.exe",
     "${env:ProgramFiles}\Microsoft SQL Server Management Studio 19\Common7\IDE\Ssms.exe"
 )
-
-$ssmsFound = $false
-
-# First try registry
 $ssmsRegPaths = @(
     "HKLM:\SOFTWARE\Microsoft\SQL Server Management Studio",
     "HKCU:\Software\Microsoft\SQL Server Management Studio"
 )
+
+$ssmsFound = $false
 
 foreach ($regPath in $ssmsRegPaths) {
     if (Test-Path $regPath) {
         try {
             $ssmsVersions = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue
             if ($ssmsVersions) {
-                $latestVersion = ($ssmsVersions | Sort-Object Name -Descending | Select-Object -First 1).Name
-                # Find the actual exe to get a precise file version
                 foreach ($exePath in $ssmsPaths) {
                     if (Test-Path $exePath) {
-                        $ssmsFileVersion = (Get-ItemProperty $exePath).VersionInfo.FileVersion
-                        Write-Status "SSMS $ssmsFileVersion" "PASS" "Installed at: $exePath"
+                        $ver = (Get-ItemProperty $exePath).VersionInfo.FileVersion
+                        Write-Result "SSMS  $ver" "PASS" $exePath
                         $TestResults["SSMS"] = "PASS"
                         $ssmsFound = $true
                         break
                     }
                 }
                 if (-not $ssmsFound) {
-                    Write-Status "SSMS version $latestVersion (registry found, exe path unconfirmed)" "PASS" `
-                        "Registry: $regPath\$latestVersion"
+                    $latestKey = ($ssmsVersions | Sort-Object Name -Descending | Select-Object -First 1).Name
+                    Write-Result "SSMS  version $latestKey  (registry confirmed)" "PASS"
                     $TestResults["SSMS"] = "PASS"
                     $ssmsFound = $true
                 }
-                break
             }
         }
         catch { }
     }
+    if ($ssmsFound) { break }
 }
 
-# Fallback: path-based detection
 if (-not $ssmsFound) {
-    foreach ($path in $ssmsPaths) {
-        if (Test-Path $path) {
-            $ssmsVersion = (Get-ItemProperty $path).VersionInfo.FileVersion
-            Write-Status "SSMS $ssmsVersion" "PASS" "Installed at: $path"
+    foreach ($exePath in $ssmsPaths) {
+        if (Test-Path $exePath) {
+            $ver = (Get-ItemProperty $exePath).VersionInfo.FileVersion
+            Write-Result "SSMS  $ver" "PASS" $exePath
             $TestResults["SSMS"] = "PASS"
             $ssmsFound = $true
             break
@@ -446,59 +448,138 @@ if (-not $ssmsFound) {
 }
 
 if (-not $ssmsFound) {
-    Write-Status "SQL Server Management Studio not found" "FAIL" `
-        "Download from: https://aka.ms/ssmsfullsetup"
+    Write-Result "SQL Server Management Studio — not found" "FAIL" "Download: https://aka.ms/ssmsfullsetup"
     $TestResults["SSMS"] = "FAIL"
 }
 
-#endregion
+Write-Host ""
 
-#region API Testing
+# ── SQL Server 2022 (Advanced only) ───────────────────────────────────────────
+if ($Advanced) {
+    Write-Probing "SQL Server 2022"
 
-Write-Section "API Testing"
+    $sqlFound       = $false
+    $sqlInstanceName = ""
+    $sqlEdition      = ""
 
-# Test 11 (was 13): Postman
-Write-Host "`nTesting Postman..." -ForegroundColor Yellow
+    try {
+        $regInstancePath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL"
+        if (Test-Path $regInstancePath) {
+            $instanceProps = Get-ItemProperty -Path $regInstancePath -ErrorAction SilentlyContinue
 
-$postmanPaths = @(
-    "${env:LOCALAPPDATA}\Postman\Postman.exe",
-    "${env:ProgramFiles}\Postman\Postman.exe",
-    "${env:ProgramFiles(x86)}\Postman\Postman.exe"
-)
+            foreach ($prop in $instanceProps.PSObject.Properties) {
+                if ($prop.Name -like "PS*") { continue }
+                $instanceKey = $prop.Value   # e.g. MSSQL16.SQLEXPRESS
 
-$postmanFound = $false
+                if ($instanceKey -like "MSSQL16.*") {
+                    $sqlInstanceName = $prop.Name
+                    $setupPath       = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceKey\Setup"
 
-# First try known paths
-foreach ($path in $postmanPaths) {
-    if (Test-Path $path) {
-        $postmanVersion = (Get-ItemProperty $path).VersionInfo.FileVersion
-        Write-Status "Postman $postmanVersion" "PASS" "Installed at: $path"
-        $TestResults["Postman"] = "PASS"
-        $postmanFound = $true
-        break
+                    if (Test-Path $setupPath) {
+                        $setup      = Get-ItemProperty -Path $setupPath -ErrorAction SilentlyContinue
+                        $sqlEdition = if ($setup.Edition) { $setup.Edition } else { "Unknown Edition" }
+                    }
+
+                    $serviceName = if ($sqlInstanceName -eq "MSSQLSERVER") {
+                        "MSSQLSERVER"
+                    }
+                    else {
+                        "MSSQL`$$sqlInstanceName"
+                    }
+
+                    $svc = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+                    if ($null -eq $svc) {
+                        $svc = Get-Service -ErrorAction SilentlyContinue |
+                            Where-Object { $_.Name -like "MSSQL*" -and $_.DisplayName -like "*SQL Server*" } |
+                            Select-Object -First 1
+                    }
+
+                    $sqlFound = $true
+
+                    if ($svc -and $svc.Status -eq "Running") {
+                        Write-Result "SQL Server 2022  [$sqlEdition]  Instance: $sqlInstanceName" "PASS" `
+                            "Service: $serviceName — Running"
+                        $TestResults["SQLServer2022"] = "PASS"
+                    }
+                    else {
+                        $state = if ($svc) { $svc.Status.ToString() } else { "Unknown" }
+                        Write-Result "SQL Server 2022  [$sqlEdition]  Instance: $sqlInstanceName" "WARN" `
+                            "Service state: $state — Start via Services.msc or SQL Server Configuration Manager"
+                        $TestResults["SQLServer2022"] = "WARN"
+                    }
+                    break
+                }
+            }
+        }
+
+        if (-not $sqlFound) {
+            $fallbackSvcs = Get-Service -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "MSSQL*" -or $_.DisplayName -like "*SQL Server*" }
+
+            if ($fallbackSvcs) {
+                Write-Result "SQL Server — service detected (version unconfirmed via registry)" "WARN" `
+                    "Services: $($fallbackSvcs.Name -join ', ')"
+                $TestResults["SQLServer2022"] = "WARN"
+            }
+            else {
+                Write-Result "SQL Server 2022 — not found" "FAIL" `
+                    "Install Developer Edition: https://go.microsoft.com/fwlink/p/?linkid=2215158"
+                $TestResults["SQLServer2022"] = "FAIL"
+            }
+        }
+    }
+    catch {
+        Write-Result "SQL Server 2022 — check error" "FAIL" $_.Exception.Message
+        $TestResults["SQLServer2022"] = "FAIL"
     }
 }
 
-# Fallback: registry uninstall entries
-if (-not $postmanFound) {
-    $uninstallPaths = @(
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 6 — API TESTING  (Advanced only)
+# ──────────────────────────────────────────────────────────────────────────────
+
+if ($Advanced) {
+    Write-SectionHeader "API Testing"
+
+    # ── Postman ───────────────────────────────────────────────────────────────
+    Write-Probing "Postman"
+
+    $postmanPaths = @(
+        "${env:LOCALAPPDATA}\Postman\Postman.exe",
+        "${env:ProgramFiles}\Postman\Postman.exe",
+        "${env:ProgramFiles(x86)}\Postman\Postman.exe"
+    )
+    $uninstallRoots = @(
         "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
         "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
     )
 
-    foreach ($regPath in $uninstallPaths) {
-        if (Test-Path $regPath) {
+    $postmanFound = $false
+
+    foreach ($path in $postmanPaths) {
+        if (Test-Path $path) {
+            $ver = (Get-ItemProperty $path).VersionInfo.FileVersion
+            Write-Result "Postman  $ver" "PASS" $path
+            $TestResults["Postman"] = "PASS"
+            $postmanFound = $true
+            break
+        }
+    }
+
+    if (-not $postmanFound) {
+        foreach ($root in $uninstallRoots) {
+            if (-not (Test-Path $root)) { continue }
             try {
-                $postmanEntry = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue |
+                $entry = Get-ChildItem -Path $root -ErrorAction SilentlyContinue |
                     Get-ItemProperty -ErrorAction SilentlyContinue |
                     Where-Object { $_.DisplayName -like "*Postman*" } |
                     Select-Object -First 1
 
-                if ($postmanEntry) {
-                    $postmanVersion = if ($postmanEntry.DisplayVersion) { $postmanEntry.DisplayVersion } else { "unknown version" }
-                    $postmanInstallLoc = if ($postmanEntry.InstallLocation) { $postmanEntry.InstallLocation } else { "unknown location" }
-                    Write-Status "Postman $postmanVersion" "PASS" "Registry entry found at: $postmanInstallLoc"
+                if ($entry) {
+                    $ver = if ($entry.DisplayVersion) { $entry.DisplayVersion } else { "unknown version" }
+                    $loc = if ($entry.InstallLocation) { $entry.InstallLocation } else { "unknown location" }
+                    Write-Result "Postman  $ver" "PASS" $loc
                     $TestResults["Postman"] = "PASS"
                     $postmanFound = $true
                     break
@@ -506,199 +587,277 @@ if (-not $postmanFound) {
             }
             catch { }
         }
-        if ($postmanFound) { break }
+    }
+
+    if (-not $postmanFound) {
+        Write-Result "Postman — not found" "FAIL" "Download: https://www.postman.com/downloads/"
+        $TestResults["Postman"] = "FAIL"
     }
 }
 
-if (-not $postmanFound) {
-    Write-Status "Postman not found" "FAIL" "Download from: https://www.postman.com/downloads/"
-    $TestResults["Postman"] = "FAIL"
-}
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 7 — PYTHON TOOLING
+# ──────────────────────────────────────────────────────────────────────────────
 
-#endregion
+Write-SectionHeader "Python Tooling"
 
-#region Python Tooling
-
-Write-Section "Python Tooling"
-
-# Test 12 (was 9): UV (Python package manager)
-Write-Host "`nTesting UV..." -ForegroundColor Yellow
-$uvTest = Test-Command "uv --version" "UV"
-if ($uvTest.Success) {
-    $version = $uvTest.Output.Trim()
-    Write-Status "UV $version" "PASS" $version
+# ── UV ────────────────────────────────────────────────────────────────────────
+Write-Probing "UV (Python package manager)"
+$r = Test-Command "uv --version"
+if ($r.Success) {
+    $version = $r.Output.Trim()
+    Write-Result "UV  $version" "PASS"
     $TestResults["UV"] = "PASS"
 }
 else {
-    Write-Status "UV not found" "FAIL" $uvTest.Error
+    Write-Result "UV — not found" "FAIL" "Install: pip install uv"
     $TestResults["UV"] = "FAIL"
 }
 
-#endregion
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 8 — SYSTEM
+# ──────────────────────────────────────────────────────────────────────────────
 
-#region System
+Write-SectionHeader "System"
 
-Write-Section "System"
+# ── WSL ───────────────────────────────────────────────────────────────────────
+Write-Probing "Windows Subsystem for Linux (WSL)"
+$r = Test-Command "wsl --version"
+if ($r.Success) {
+    Write-Result "WSL  —  installed" "PASS"
 
-# Test 13 (was 10): WSL
-Write-Host "`nTesting WSL..." -ForegroundColor Yellow
-$wslTest = Test-Command "wsl --version" "WSL"
-if ($wslTest.Success) {
-    Write-Status "WSL installed" "PASS" "Windows Subsystem for Linux available"
-
-    # Test WSL distributions
-    $wslListTest = Test-Command "wsl --list --verbose" "WSL Distributions"
-    if ($wslListTest.Success -and $wslListTest.Output -notmatch "No installed distributions") {
-        Write-Status "WSL distributions available" "PASS" "Linux distributions installed"
+    $distros = Test-Command "wsl --list --verbose"
+    if ($distros.Success -and $distros.Output -notmatch "No installed distributions") {
+        Write-SubResult "Linux distributions  —  available" "PASS"
         $TestResults["WSL"] = "PASS"
     }
     else {
-        Write-Status "No WSL distributions installed" "WARN" "Install Ubuntu: wsl --install Ubuntu"
+        Write-SubResult "Linux distributions  —  none installed" "WARN" "Run: wsl --install Ubuntu"
         $TestResults["WSL"] = "WARN"
     }
 }
 else {
-    # Fallback: wsl --list works on older WSL that doesn't support --version
-    $wslListFallback = Test-Command "wsl --list" "WSL"
-    if ($wslListFallback.Success) {
-        Write-Status "WSL installed (legacy)" "PASS" "WSL available"
+    $fallback = Test-Command "wsl --list"
+    if ($fallback.Success) {
+        Write-Result "WSL  —  installed (legacy build)" "PASS"
         $TestResults["WSL"] = "PASS"
     }
     else {
-        Write-Status "WSL not found" "FAIL" $wslTest.Error
+        Write-Result "WSL — not found" "FAIL" "Enable via: wsl --install"
         $TestResults["WSL"] = "FAIL"
     }
 }
 
-# Test 14 (was 11): PowerShell via Winget — CHECK ONLY, no upgrade
-Write-Host "`nTesting PowerShell (via Winget)..." -ForegroundColor Yellow
-$wingetTest = Test-Command "winget --version" "Winget"
-if ($wingetTest.Success) {
-    Write-Status "Winget $($wingetTest.Output.Trim()) available" "PASS" $wingetTest.Output.Trim()
+Write-Host ""
 
-    # List installed PowerShell — does NOT upgrade
-    $psListTest = Test-Command "winget list --id Microsoft.PowerShell --accept-source-agreements" "PowerShell List" "" 30
-    if ($psListTest.Success -and $psListTest.Output -match "Microsoft.PowerShell") {
-        # Extract version from winget list output
-        $psVersion = $PSVersionTable.PSVersion.ToString()
-        Write-Status "PowerShell $psVersion (up to date check via winget)" "PASS" `
-            "Use 'winget upgrade Microsoft.PowerShell' to update if needed"
+# ── PowerShell via Winget (check only — no upgrade triggered) ─────────────────
+Write-Probing "PowerShell  (via Winget)"
+$r = Test-Command "winget --version"
+if ($r.Success) {
+    Write-Result "Winget  $($r.Output.Trim())  —  available" "PASS"
+
+    $psList = Test-Command "winget list --id Microsoft.PowerShell --accept-source-agreements" "" 30
+    if ($psList.Success -and $psList.Output -match "Microsoft.PowerShell") {
+        $psVer = $PSVersionTable.PSVersion.ToString()
+        Write-SubResult "PowerShell  $psVer  —  current" "PASS" "To update: winget upgrade Microsoft.PowerShell"
         $TestResults["PowerShell"] = "PASS"
     }
     else {
-        Write-Status "PowerShell not found via winget list" "WARN" `
-            "Run: winget upgrade Microsoft.PowerShell to install latest version"
+        Write-SubResult "PowerShell  —  not found via winget list" "WARN" "Run: winget upgrade Microsoft.PowerShell"
         $TestResults["PowerShell"] = "WARN"
     }
 }
 else {
-    Write-Status "Winget not found" "FAIL" $wingetTest.Error
+    Write-Result "Winget — not found" "FAIL" "Install Windows Package Manager from the Microsoft Store"
     $TestResults["PowerShell"] = "FAIL"
 }
 
-#endregion
+# ══════════════════════════════════════════════════════════════════════════════
+#  SUMMARY
+# ══════════════════════════════════════════════════════════════════════════════
 
-# Summary Report
-Write-Host "`n════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "                        TEST SUMMARY REPORT" -ForegroundColor Cyan
-Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-
-$passCount = ($TestResults.Values | Where-Object { $_ -eq "PASS" }).Count
-$failCount = ($TestResults.Values | Where-Object { $_ -eq "FAIL" }).Count
-$warnCount = ($TestResults.Values | Where-Object { $_ -eq "WARN" }).Count
+$passCount  = ($TestResults.Values | Where-Object { $_ -eq "PASS" }).Count
+$failCount  = ($TestResults.Values | Where-Object { $_ -eq "FAIL" }).Count
+$warnCount  = ($TestResults.Values | Where-Object { $_ -eq "WARN" }).Count
 $totalTests = $TestResults.Count
 
-Write-Host "`nOverall Status:" -ForegroundColor White
-Write-Host "  ✓ Passed:   $passCount/$totalTests" -ForegroundColor Green
-Write-Host "  ✗ Failed:   $failCount/$totalTests" -ForegroundColor Red
-Write-Host "  ⚠ Warnings: $warnCount/$totalTests" -ForegroundColor Yellow
+$w = 66
+Write-Host ""
+Write-Host ("  ╔" + ("═" * $w) + "╗") -ForegroundColor Cyan
+Write-Host ("  ║" + "  VERIFICATION RESULTS SUMMARY".PadRight($w) + "║") -ForegroundColor White
+Write-Host ("  ╠" + ("═" * $w) + "╣") -ForegroundColor DarkCyan
 
-Write-Host "`nDetailed Results:" -ForegroundColor White
-foreach ($test in $TestResults.GetEnumerator() | Sort-Object Name) {
-    switch ($test.Value) {
-        "PASS" { Write-Host "  ✓ $($test.Key)" -ForegroundColor Green }
-        "FAIL" { Write-Host "  ✗ $($test.Key)" -ForegroundColor Red }
-        "WARN" { Write-Host "  ⚠ $($test.Key)" -ForegroundColor Yellow }
+# Counts row
+$countsLine = ("  ✓ Passed: $passCount   ✗ Failed: $failCount   ⚠ Warned: $warnCount   · Total: $totalTests").PadRight($w)
+Write-Host "  ║" -NoNewline -ForegroundColor Cyan
+Write-Host ("  ✓ Passed: ") -NoNewline -ForegroundColor DarkGray
+Write-Host ("$passCount") -NoNewline -ForegroundColor Green
+Write-Host ("   ✗ Failed: ") -NoNewline -ForegroundColor DarkGray
+Write-Host ("$failCount") -NoNewline -ForegroundColor Red
+Write-Host ("   ⚠ Warned: ") -NoNewline -ForegroundColor DarkGray
+Write-Host ("$warnCount") -NoNewline -ForegroundColor Yellow
+Write-Host ("   · Total: $totalTests".PadRight($w - 38) + "║") -ForegroundColor DarkGray
+
+Write-Host ("  ╠" + ("═" * $w) + "╣") -ForegroundColor DarkCyan
+
+# Per-test rows
+foreach ($test in $TestResults.GetEnumerator()) {
+    $key    = $test.Key.PadRight(22)
+    $status = $test.Value
+
+    Write-Host "  ║  " -NoNewline -ForegroundColor Cyan
+    Write-Host $key -NoNewline -ForegroundColor Gray
+
+    switch ($status) {
+        "PASS" {
+            Write-Host " PASS " -BackgroundColor DarkGreen  -ForegroundColor White -NoNewline
+            Write-Host (" " * ($w - 30)) -NoNewline
+        }
+        "FAIL" {
+            Write-Host " FAIL " -BackgroundColor DarkRed    -ForegroundColor White -NoNewline
+            Write-Host (" " * ($w - 30)) -NoNewline
+        }
+        "WARN" {
+            Write-Host " WARN " -BackgroundColor DarkYellow -ForegroundColor Black -NoNewline
+            Write-Host (" " * ($w - 30)) -NoNewline
+        }
     }
+    Write-Host "  ║" -ForegroundColor Cyan
 }
 
-# System Information
-Write-Host "`n════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "                      SYSTEM INFORMATION" -ForegroundColor Cyan
-Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host ("  ╚" + ("═" * $w) + "╝") -ForegroundColor Cyan
 
-$os = Get-CimInstance Win32_OperatingSystem
+# ══════════════════════════════════════════════════════════════════════════════
+#  SYSTEM INFORMATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+Write-Host ""
+Write-Host ("  ╔" + ("═" * $w) + "╗") -ForegroundColor DarkCyan
+Write-Host ("  ║" + "  SYSTEM INFORMATION".PadRight($w) + "║") -ForegroundColor White
+Write-Host ("  ╠" + ("═" * $w) + "╣") -ForegroundColor DarkCyan
+
+$os       = Get-CimInstance Win32_OperatingSystem
 $computer = Get-CimInstance Win32_ComputerSystem
-$memory = [math]::Round($computer.TotalPhysicalMemory / 1GB, 2)
-$disk = Get-CimInstance Win32_LogicalDisk |
+$memory   = [math]::Round($computer.TotalPhysicalMemory / 1GB, 2)
+$disk     = (Get-CimInstance Win32_LogicalDisk |
     Where-Object { $_.DriveType -eq 3 } |
     ForEach-Object { [math]::Round($_.FreeSpace / 1GB, 2) } |
-    Measure-Object -Sum
+    Measure-Object -Sum).Sum
 
-Write-Host "Computer Name:      $($computer.Name)" -ForegroundColor Gray
-Write-Host "OS Version:         $($os.Caption) $($os.Version)" -ForegroundColor Gray
-Write-Host "Total RAM:          $memory GB" -ForegroundColor Gray
-Write-Host "Free Disk Space:    $([math]::Round($disk.Sum, 2)) GB" -ForegroundColor Gray
-Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)" -ForegroundColor Gray
-Write-Host "Execution Policy:   $(Get-ExecutionPolicy)" -ForegroundColor Gray
-
-# Recommendations
-Write-Host "`n════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "                        RECOMMENDATIONS" -ForegroundColor Cyan
-Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-
-if ($failCount -gt 0) {
-    Write-Host "`nCritical Issues Found:" -ForegroundColor Red
-    foreach ($test in $TestResults.GetEnumerator() | Where-Object { $_.Value -eq "FAIL" }) {
-        switch ($test.Key) {
-            "Docker"        { Write-Host "  • Start Docker Desktop and ensure it is running" -ForegroundColor White }
-            "Python"        { Write-Host "  • Reinstall Python 3.12 or check PATH environment variable" -ForegroundColor White }
-            "NodeJS"        { Write-Host "  • Reinstall Node.js or check PATH environment variable" -ForegroundColor White }
-            "PowerShell"    { Write-Host "  • Install Winget or run: winget upgrade Microsoft.PowerShell" -ForegroundColor White }
-            "SQLServer2022" { Write-Host "  • Install SQL Server 2022 Developer Edition from https://go.microsoft.com/fwlink/p/?linkid=2215158" -ForegroundColor White }
-            "SSMS"          { Write-Host "  • Download SQL Server Management Studio from https://aka.ms/ssmsfullsetup" -ForegroundColor White }
-            "Postman"       { Write-Host "  • Install Postman from https://www.postman.com/downloads/" -ForegroundColor White }
-            default         { Write-Host "  • Check $($test.Key) installation and PATH configuration" -ForegroundColor White }
-        }
-    }
+function Write-InfoRow {
+    param([string]$Key, [string]$Value)
+    $row = ("  " + $Key.PadRight(20) + $Value).PadRight($w)
+    Write-Host "  ║" -NoNewline -ForegroundColor DarkCyan
+    Write-Host ("  " + $Key.PadRight(20)) -NoNewline -ForegroundColor DarkGray
+    Write-Host $Value.PadRight($w - 22) -NoNewline -ForegroundColor Gray
+    Write-Host "║" -ForegroundColor DarkCyan
 }
 
-if ($warnCount -gt 0) {
-    Write-Host "`nWarnings (Optional / Action Required):" -ForegroundColor Yellow
-    foreach ($test in $TestResults.GetEnumerator() | Where-Object { $_.Value -eq "WARN" }) {
-        switch ($test.Key) {
-            "Kubernetes"    { Write-Host "  • Enable Kubernetes in Docker Desktop Settings → Kubernetes" -ForegroundColor White }
-            "WSL"           { Write-Host "  • Install a Linux distribution: wsl --install Ubuntu" -ForegroundColor White }
-            "PowerShell"    { Write-Host "  • Update PowerShell: winget upgrade Microsoft.PowerShell" -ForegroundColor White }
-            "SQLServer2022" { Write-Host "  • Start SQL Server service: Open Services.msc or SQL Server Configuration Manager" -ForegroundColor White }
+Write-InfoRow "Computer"       $computer.Name
+Write-InfoRow "OS"             "$($os.Caption) $($os.Version)"
+Write-InfoRow "Total RAM"      "$memory GB"
+Write-InfoRow "Free Disk"      "$([math]::Round($disk, 2)) GB"
+Write-InfoRow "PowerShell"     $PSVersionTable.PSVersion.ToString()
+Write-InfoRow "Exec Policy"    (Get-ExecutionPolicy)
+Write-InfoRow "Check Mode"     $(if ($Advanced) { "Advanced" } else { "Standard" })
+
+Write-Host ("  ╚" + ("═" * $w) + "╝") -ForegroundColor DarkCyan
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  RECOMMENDATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+if ($failCount -gt 0 -or $warnCount -gt 0) {
+    Write-Host ""
+    Write-Host ("  ╔" + ("═" * $w) + "╗") -ForegroundColor DarkYellow
+    Write-Host ("  ║" + "  RECOMMENDATIONS".PadRight($w) + "║") -ForegroundColor White
+    Write-Host ("  ╠" + ("═" * $w) + "╣") -ForegroundColor DarkYellow
+
+    if ($failCount -gt 0) {
+        Write-Host ("  ║" + "  Critical — resolve before starting the workshop:".PadRight($w) + "║") -ForegroundColor Red
+        foreach ($test in $TestResults.GetEnumerator() | Where-Object { $_.Value -eq "FAIL" }) {
+            $msg = switch ($test.Key) {
+                "Python"        { "Reinstall Python 3.12 and ensure it is added to PATH" }
+                "NodeJS"        { "Reinstall Node.js LTS and ensure it is added to PATH" }
+                "Docker"        { "Launch Docker Desktop and wait for it to fully start" }
+                "VSCode"        { "Reinstall VS Code and choose 'Add to PATH' during setup" }
+                "Chrome"        { "Install Google Chrome from https://www.google.com/chrome" }
+                "SSMS"          { "Download SSMS from https://aka.ms/ssmsfullsetup" }
+                "SQLServer2022" { "Install SQL Server 2022 Dev Ed: https://go.microsoft.com/fwlink/p/?linkid=2215158" }
+                "Postman"       { "Install Postman from https://www.postman.com/downloads/" }
+                "UV"            { "Install UV: pip install uv" }
+                "PowerShell"    { "Install Winget or run: winget upgrade Microsoft.PowerShell" }
+                default         { "Check $($test.Key) installation and PATH configuration" }
+            }
+            Write-Host ("  ║" + "    •  $msg".PadRight($w) + "║") -ForegroundColor White
         }
     }
+
+    if ($failCount -gt 0 -and $warnCount -gt 0) {
+        Write-Host ("  ║" + (" " * $w) + "║") -ForegroundColor DarkYellow
+    }
+
+    if ($warnCount -gt 0) {
+        Write-Host ("  ║" + "  Advisory — optional or can be resolved after install:".PadRight($w) + "║") -ForegroundColor Yellow
+        foreach ($test in $TestResults.GetEnumerator() | Where-Object { $_.Value -eq "WARN" }) {
+            $msg = switch ($test.Key) {
+                "Kubernetes"    { "Enable Kubernetes in Docker Desktop → Settings → Kubernetes" }
+                "WSL"           { "Install Ubuntu: wsl --install Ubuntu" }
+                "PowerShell"    { "Update PowerShell: winget upgrade Microsoft.PowerShell" }
+                "SQLServer2022" { "Start the SQL Server service via Services.msc or SQL Server Configuration Manager" }
+                default         { "Review $($test.Key) configuration" }
+            }
+            Write-Host ("  ║" + "    ⚠  $msg".PadRight($w) + "║") -ForegroundColor White
+        }
+    }
+
+    Write-Host ("  ╚" + ("═" * $w) + "╝") -ForegroundColor DarkYellow
 }
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  VERDICT
+# ══════════════════════════════════════════════════════════════════════════════
+
+Write-Host ""
 if ($failCount -eq 0 -and $warnCount -eq 0) {
-    Write-Host "`n🎉 All systems operational! Lab environment is ready for training." -ForegroundColor Green
+    Write-Host "  ✦  " -NoNewline -ForegroundColor Green
+    Write-Host "All systems operational. " -NoNewline -ForegroundColor Green
+    Write-Host "Lab environment is fully ready for training." -ForegroundColor White
 }
 elseif ($failCount -eq 0) {
-    Write-Host "`n✓ Core systems operational. Training can proceed with minor limitations." -ForegroundColor Yellow
+    Write-Host "  ●  " -NoNewline -ForegroundColor Yellow
+    Write-Host "Core systems operational. " -NoNewline -ForegroundColor Yellow
+    Write-Host "Training can proceed — review warnings above." -ForegroundColor White
 }
 else {
-    Write-Host "`n⚠ Critical issues found. Please resolve failed tests before starting training." -ForegroundColor Red
+    Write-Host "  ✖  " -NoNewline -ForegroundColor Red
+    Write-Host "Critical issues detected. " -NoNewline -ForegroundColor Red
+    Write-Host "Resolve failed checks before starting training." -ForegroundColor White
 }
 
-Write-Host "`n════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "Test completed at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
-Write-Host "════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host ""
+Write-Host ("  " + ("─" * $w)) -ForegroundColor DarkGray
+Write-Host "  Completed at  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor DarkGray
+if (-not $Advanced) {
+    Write-Host "  Tip: run with -Advanced to also check SQL Server 2022 and Postman." -ForegroundColor DarkGray
+}
+Write-Host ("  " + ("─" * $w)) -ForegroundColor DarkGray
+Write-Host ""
 
-# Export results to JSON if requested
+# ══════════════════════════════════════════════════════════════════════════════
+#  JSON EXPORT  (-Detailed)
+# ══════════════════════════════════════════════════════════════════════════════
+
 if ($Detailed) {
     $reportPath = ".\LabTestReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
-    $report = @{
+    @{
         TestDate   = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+        Mode       = if ($Advanced) { "Advanced" } else { "Standard" }
         SystemInfo = @{
             ComputerName      = $computer.Name
             OS                = "$($os.Caption) $($os.Version)"
             RAM_GB            = $memory
-            FreeDisk_GB       = [math]::Round($disk.Sum, 2)
+            FreeDisk_GB       = [math]::Round($disk, 2)
             PowerShellVersion = $PSVersionTable.PSVersion.ToString()
         }
         TestResults = $TestResults
@@ -708,8 +867,8 @@ if ($Detailed) {
             Failed     = $failCount
             Warnings   = $warnCount
         }
-    }
+    } | ConvertTo-Json -Depth 3 | Out-File -FilePath $reportPath -Encoding UTF8
 
-    $report | ConvertTo-Json -Depth 3 | Out-File -FilePath $reportPath -Encoding UTF8
-    Write-Host "`nDetailed report saved to: $reportPath" -ForegroundColor Cyan
+    Write-Host "  Report saved  →  $reportPath" -ForegroundColor Cyan
+    Write-Host ""
 }
