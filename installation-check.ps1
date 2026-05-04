@@ -146,10 +146,11 @@ function Test-Command {
             param($cmd)
             try {
                 $out = & cmd /c $cmd 2>&1
-                return @{ Success = $true; Output = ($out | Out-String) }
+                $exitCode = $LASTEXITCODE
+                return @{ Success = $true; Output = ($out | Out-String); ExitCode = $exitCode }
             }
             catch {
-                return @{ Success = $false; Output = ""; Error = $_.Exception.Message }
+                return @{ Success = $false; Output = ""; Error = $_.Exception.Message; ExitCode = -1 }
             }
         } -ArgumentList $Command
 
@@ -168,6 +169,9 @@ function Test-Command {
 
         if ($result.Success) {
             $out = $result.Output
+            if ($null -ne $result.ExitCode -and $result.ExitCode -ne 0) {
+                return @{ Success = $false; Output = $out; Error = "Process exited with code $($result.ExitCode)" }
+            }
             if ($ExpectedPattern -and ($out -notmatch $ExpectedPattern)) {
                 return @{ Success = $false; Output = $out; Error = "Pattern '$ExpectedPattern' not found" }
             }
@@ -286,7 +290,7 @@ Write-Probing "Docker Desktop"
 $r = Test-Command "docker --version"
 if ($r.Success) {
     $version = $r.Output.Trim()
-    Write-Result "Docker Engine  —  $version" "PASS"
+    Write-Result "Docker Engine  —  $version" "INFO"
 
     $daemon = Test-Command "docker info" "" 10
     if ($daemon.Success) {
@@ -422,12 +426,7 @@ foreach ($regPath in $ssmsRegPaths) {
                         break
                     }
                 }
-                if (-not $ssmsFound) {
-                    $latestKey = ($ssmsVersions | Sort-Object Name -Descending | Select-Object -First 1).Name
-                    Write-Result "SSMS  version $latestKey  (registry confirmed)" "PASS"
-                    $TestResults["SSMS"] = "PASS"
-                    $ssmsFound = $true
-                }
+
             }
         }
         catch { }
