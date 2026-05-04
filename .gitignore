@@ -122,3 +122,5 @@ coverage/
 *.rar
 *.tar
 *.zip
+
+.claude/
