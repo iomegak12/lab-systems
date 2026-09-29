@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `install-lab-software-otlp.ps1` - OTLP / Observability lab installer: base lab software plus Temurin JDK 21, Maven, OpenTelemetry Java agent, jq, curl, Grafana k6, Java/Docker/REST Client VS Code extensions, and pre-pulled Docker images for OTel Collector (contrib), telemetrygen, Prometheus, Grafana, Loki, Tempo and Jaeger
+- `-ImagesOnly` switch on the OTLP installer to (re)pull images after a reboot
+- `otlp-images.psd1` - pinned image tags and Java agent version, used by both scripts
+- `installation-check.ps1 -Otlp` - verifies the OTLP lab software and images
 - Initial release of lab systems environment setup scripts
 - `install-lab-software.cmd` - Automated installation script
 - `installation-check.ps1` - Verification and testing script

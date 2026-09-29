@@ -74,6 +74,51 @@ install-lab-software.cmd
 - Installs all VS Code extensions
 - Generates detailed installation log
 
+### `install-lab-software-otlp.ps1`
+
+Installer for the **OpenTelemetry (OTLP) with open-source backends** session. Installs everything from `install-lab-software.ps1`, plus the OTLP lab software below. Pinned versions live in [`otlp-images.psd1`](otlp-images.psd1), which must sit in the same folder as the script.
+
+**Requirements:**
+- Windows 10/11
+- PowerShell 7+ (`pwsh`), run as Administrator
+- Internet connection
+- `otlp-images.psd1` next to the script
+
+**Usage:**
+```powershell
+# Full install (base lab software + OTLP additions)
+pwsh -File .\install-lab-software-otlp.ps1
+
+# After the first run + reboot, once Docker Desktop is up: pull only the images
+pwsh -File .\install-lab-software-otlp.ps1 -ImagesOnly
+
+# Reinstall / re-pull everything
+pwsh -File .\install-lab-software-otlp.ps1 -SkipChecks
+```
+
+**OTLP additions:**
+- Temurin JDK 21 and Maven
+- OpenTelemetry Java agent, downloaded to `C:\otlp-lab\tools\opentelemetry-javaagent.jar` (machine env var `OTEL_JAVAAGENT_PATH`)
+- jq, curl, Grafana k6
+- VS Code extensions: Java Extension Pack, Maven, Docker, REST Client
+- Docker images, **pulled only** (students start the containers during the lab):
+
+| Component | Image | Default port(s) |
+|---|---|---|
+| OTel Collector (contrib) | `otel/opentelemetry-collector-contrib:0.161.0` | 4317 (gRPC), 4318 (HTTP) |
+| telemetrygen | `ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.161.0` | - |
+| Prometheus | `prom/prometheus:v3.15.0` | 9090 |
+| Grafana | `grafana/grafana:13.2.2` | 3000 |
+| Loki | `grafana/loki:3.7.8` | 3100 |
+| Tempo | `grafana/tempo:3.0.3` | 3200 |
+| Jaeger (v2 all-in-one) | `jaegertracing/jaeger:2.21.0` | 16686 (UI) |
+
+Lab architecture: Node.js / Python / Java apps → OTLP → OTel Collector → Prometheus (metrics), Loki (logs), Tempo and Jaeger (traces) → Grafana.
+
+**Notes:**
+- On a fresh machine, Docker Desktop usually can't start until after a reboot. The script then reports the images as MISSING, so reboot and re-run with `-ImagesOnly`.
+- To bump a version, edit `otlp-images.psd1` only. Both this script and `installation-check.ps1 -Otlp` read it.
+
 ### `installation-check.ps1`
 
 PowerShell script that tests all installed software and generates a comprehensive report.
@@ -92,6 +137,12 @@ PowerShell script that tests all installed software and generates a comprehensiv
 
 # Detailed test with JSON report
 .\installation-check.ps1 -Detailed
+
+# Also check SQL Server 2022 and Postman
+.\installation-check.ps1 -Advanced
+
+# Also check the OTLP lab software (JDK 21, Maven, jq, curl, k6, Java agent, Docker images)
+.\installation-check.ps1 -Otlp
 ```
 
 **Features:**

@@ -6,8 +6,12 @@
     Verifies all required software is installed and operational.
     Standard mode (default) : 12 core component checks.
     Advanced mode (-Advanced): adds SQL Server 2022 + Postman (14 checks total).
+    OTLP mode (-Otlp): adds JDK 21, Maven, jq, curl, k6, OTel Java agent and the
+    observability Docker images pinned in otlp-images.psd1 (+7 checks).
 .PARAMETER Advanced
     Run extended checks: SQL Server 2022 and Postman, in addition to all core checks.
+.PARAMETER Otlp
+    Also verify the OTLP / Observability lab software installed by install-lab-software-otlp.ps1.
 .PARAMETER QuickTest
     Skip optional sub-tests (pip, npm, Docker hello-world) for a faster run.
 .PARAMETER Detailed
@@ -17,22 +21,31 @@
     .\installation-check.ps1 -Advanced
     .\installation-check.ps1 -Advanced -Detailed
     .\installation-check.ps1 -QuickTest
+    .\installation-check.ps1 -Otlp
 #>
 param(
     [switch]$Advanced  = $false,
     [switch]$Detailed  = $false,
-    [switch]$QuickTest = $false
+    [switch]$QuickTest = $false,
+    [switch]$Otlp      = $false
 )
 
 $ErrorActionPreference = "Continue"
+
+$CheckMode = if ($Advanced) { "Advanced" } else { "Standard" }
+if ($Otlp) { $CheckMode += " + OTLP" }
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  UI HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
 function Write-Banner {
-    $modeLabel   = if ($Advanced) { "Advanced  (SQL Server 2022 + Postman included)" } else { "Standard" }
-    $totalChecks = if ($Advanced) { 14 } else { 12 }
+    $modeLabel   = if ($Otlp) { "$CheckMode  (observability stack included)" }
+                   elseif ($Advanced) { "Advanced  (SQL Server 2022 + Postman included)" }
+                   else { "Standard" }
+    $totalChecks = 12
+    if ($Advanced) { $totalChecks += 2 }
+    if ($Otlp)     { $totalChecks += 7 }
     $startedAt   = Get-Date -Format "yyyy-MM-dd  HH:mm:ss"
     $w           = 66
 
@@ -595,7 +608,127 @@ if ($Advanced) {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  SECTION 7 — PYTHON TOOLING
+#  SECTION 7 — OTLP / OBSERVABILITY  (-Otlp only)
+# ──────────────────────────────────────────────────────────────────────────────
+
+if ($Otlp) {
+    Write-SectionHeader "OTLP / Observability"
+
+    $otlpConfigFile = Join-Path $PSScriptRoot "otlp-images.psd1"
+    $otlpConfig     = $null
+    if (Test-Path $otlpConfigFile) {
+        $otlpConfig = Import-PowerShellDataFile -Path $otlpConfigFile
+    }
+
+    # ── JDK 21 ────────────────────────────────────────────────────────────────
+    Write-Probing "Java (JDK 21)"
+    $r = Test-Command "java -version" 'version "21'
+    if ($r.Success) {
+        $firstLine = ($r.Output -split "`n")[0].Trim()
+        Write-Result "Java  —  $firstLine" "PASS"
+        $TestResults["JDK21"] = "PASS"
+    }
+    else {
+        Write-Result "Java 21 — not found or wrong version" "FAIL" $r.Error
+        $TestResults["JDK21"] = "FAIL"
+    }
+
+    Write-Host ""
+
+    # ── Maven ─────────────────────────────────────────────────────────────────
+    Write-Probing "Maven"
+    $r = Test-Command "mvn -v"
+    if ($r.Success) {
+        $firstLine = ($r.Output -split "`n")[0].Trim()
+        Write-Result "Maven  —  $firstLine" "PASS"
+        $TestResults["Maven"] = "PASS"
+    }
+    else {
+        Write-Result "Maven — not found" "FAIL" $r.Error
+        $TestResults["Maven"] = "FAIL"
+    }
+
+    Write-Host ""
+
+    # ── jq / curl / k6 ────────────────────────────────────────────────────────
+    $cliTools = @(
+        @{ Key = "jq";   Name = "jq";         Command = "jq --version"      }
+        @{ Key = "curl"; Name = "curl";       Command = "curl.exe --version" }
+        @{ Key = "k6";   Name = "Grafana k6"; Command = "k6 version"        }
+    )
+    foreach ($tool in $cliTools) {
+        Write-Probing $tool.Name
+        $r = Test-Command $tool.Command
+        if ($r.Success) {
+            $firstLine = ($r.Output -split "`n")[0].Trim()
+            Write-Result "$($tool.Name)  —  $firstLine" "PASS"
+            $TestResults[$tool.Key] = "PASS"
+        }
+        else {
+            Write-Result "$($tool.Name) — not found" "FAIL" $r.Error
+            $TestResults[$tool.Key] = "FAIL"
+        }
+        Write-Host ""
+    }
+
+    # ── OpenTelemetry Java agent ──────────────────────────────────────────────
+    Write-Probing "OpenTelemetry Java agent"
+    $agentPath = [System.Environment]::GetEnvironmentVariable("OTEL_JAVAAGENT_PATH", "Machine")
+    if (-not $agentPath -and $otlpConfig) {
+        $agentPath = Join-Path $otlpConfig.ToolsDirectory "opentelemetry-javaagent.jar"
+    }
+    if ($agentPath -and (Test-Path $agentPath)) {
+        $agentVer = if ($otlpConfig) { $otlpConfig.JavaAgentVersion } else { "unknown version" }
+        Write-Result "OTel Java agent  $agentVer" "PASS" $agentPath
+        $TestResults["OtelJavaAgent"] = "PASS"
+    }
+    else {
+        Write-Result "OTel Java agent — not found" "FAIL" "Expected at OTEL_JAVAAGENT_PATH or C:\otlp-lab\tools"
+        $TestResults["OtelJavaAgent"] = "FAIL"
+    }
+
+    Write-Host ""
+
+    # ── Observability Docker images ───────────────────────────────────────────
+    Write-Probing "Observability Docker images"
+    if (-not $otlpConfig) {
+        Write-Result "Observability images — otlp-images.psd1 not found" "FAIL" $otlpConfigFile
+        $TestResults["OtlpImages"] = "FAIL"
+    }
+    elseif ($TestResults["Docker"] -ne "PASS") {
+        Write-Result "Observability images — Docker daemon not running" "FAIL" "Launch Docker Desktop, then re-run this check"
+        $TestResults["OtlpImages"] = "FAIL"
+    }
+    else {
+        $imageResults = foreach ($image in $otlpConfig.Images) {
+            $r = Test-Command "docker image inspect $($image.Ref)" "" 20
+            [pscustomobject]@{ Name = $image.Name; Ref = $image.Ref; Present = $r.Success }
+        }
+        $missing = @($imageResults | Where-Object { -not $_.Present }).Count
+        $total   = @($imageResults).Count
+
+        if ($missing -eq 0) {
+            Write-Result "Observability images  —  $total/$total present" "PASS"
+            $TestResults["OtlpImages"] = "PASS"
+        }
+        else {
+            Write-Result "Observability images  —  $($total - $missing)/$total present" "WARN"
+            $TestResults["OtlpImages"] = "WARN"
+        }
+
+        foreach ($img in $imageResults) {
+            if ($img.Present) {
+                Write-SubResult "$($img.Name)" "PASS" $img.Ref
+            }
+            else {
+                Write-SubResult "$($img.Name)  —  missing" "FAIL" $img.Ref
+            }
+        }
+    }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  SECTION 8 — PYTHON TOOLING
 # ──────────────────────────────────────────────────────────────────────────────
 
 Write-SectionHeader "Python Tooling"
@@ -614,7 +747,7 @@ else {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  SECTION 8 — SYSTEM
+#  SECTION 9 — SYSTEM
 # ──────────────────────────────────────────────────────────────────────────────
 
 Write-SectionHeader "System"
@@ -758,7 +891,7 @@ Write-InfoRow "Total RAM"      "$memory GB"
 Write-InfoRow "Free Disk"      "$([math]::Round($disk, 2)) GB"
 Write-InfoRow "PowerShell"     $PSVersionTable.PSVersion.ToString()
 Write-InfoRow "Exec Policy"    (Get-ExecutionPolicy)
-Write-InfoRow "Check Mode"     $(if ($Advanced) { "Advanced" } else { "Standard" })
+Write-InfoRow "Check Mode"     $CheckMode
 
 Write-Host ("  ╚" + ("═" * $w) + "╝") -ForegroundColor DarkCyan
 
@@ -786,6 +919,13 @@ if ($failCount -gt 0 -or $warnCount -gt 0) {
                 "Postman"       { "Install Postman from https://www.postman.com/downloads/" }
                 "UV"            { "Install UV: pip install uv" }
                 "PowerShell"    { "Install Winget or run: winget upgrade Microsoft.PowerShell" }
+                "JDK21"         { "Install Temurin JDK 21: choco install temurin21 -y" }
+                "Maven"         { "Install Maven: choco install maven -y" }
+                "jq"            { "Install jq: choco install jq -y" }
+                "curl"          { "Install curl: choco install curl -y" }
+                "k6"            { "Install Grafana k6: choco install k6 -y" }
+                "OtelJavaAgent" { "Re-run install-lab-software-otlp.ps1 (downloads Java agent)" }
+                "OtlpImages"    { "Run install-lab-software-otlp.ps1 -ImagesOnly (Docker on)" }
                 default         { "Check $($test.Key) installation and PATH configuration" }
             }
             Write-Host ("  ║" + "    •  $msg".PadRight($w) + "║") -ForegroundColor White
@@ -804,6 +944,7 @@ if ($failCount -gt 0 -or $warnCount -gt 0) {
                 "WSL"           { "Install Ubuntu: wsl --install Ubuntu" }
                 "PowerShell"    { "Update PowerShell: winget upgrade Microsoft.PowerShell" }
                 "SQLServer2022" { "Start the SQL Server service via Services.msc or SQL Server Configuration Manager" }
+                "OtlpImages"    { "Pull missing: install-lab-software-otlp.ps1 -ImagesOnly" }
                 default         { "Review $($test.Key) configuration" }
             }
             Write-Host ("  ║" + "    ⚠  $msg".PadRight($w) + "║") -ForegroundColor White
@@ -840,6 +981,9 @@ Write-Host "  Completed at  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Foregrou
 if (-not $Advanced) {
     Write-Host "  Tip: run with -Advanced to also check SQL Server 2022 and Postman." -ForegroundColor DarkGray
 }
+if (-not $Otlp) {
+    Write-Host "  Tip: run with -Otlp to also check the OTLP / Observability lab software." -ForegroundColor DarkGray
+}
 Write-Host ("  " + ("─" * $w)) -ForegroundColor DarkGray
 Write-Host ""
 
@@ -851,7 +995,7 @@ if ($Detailed) {
     $reportPath = ".\LabTestReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
     @{
         TestDate   = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-        Mode       = if ($Advanced) { "Advanced" } else { "Standard" }
+        Mode       = $CheckMode
         SystemInfo = @{
             ComputerName      = $computer.Name
             OS                = "$($os.Caption) $($os.Version)"
